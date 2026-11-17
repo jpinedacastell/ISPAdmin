@@ -61,8 +61,13 @@
         <nav class="sidebar">
             <div class="sidebar-header">
                 <div class="d-flex align-items-center">
-                    <img src="<%= sistema.logoUrl %>" alt="Logo" style="height: 36px; max-width: 60px; object-fit: contain;">
-                    <span class="sidebar-brand-text ms-3"><%= sistema.nombreSistema %></span>
+                    <% if (sistema.logoUrl) { %>
+                        <img src="<%= sistema.logoUrl %>" alt="<%= sistema.nombreSistema %>" title="<%= sistema.nombreSistema %>"
+                             style="height: 44px; max-width: 100%; object-fit: contain;">
+                    <% } else { %>
+                        <i class="fas fa-wifi fa-2x text-white"></i>
+                        <span class="sidebar-brand-text ms-3"><%= sistema.nombreSistema %></span>
+                    <% } %>
                 </div>
             </div>
             
