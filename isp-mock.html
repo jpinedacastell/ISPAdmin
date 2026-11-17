@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConectaNet ISP — Mock (SOLID)</title>
+<style>
+  :root{
+    --bg:#f4f6fb;--panel:#fff;--ink:#1c2233;--muted:#6b7385;--line:#e3e7ef;
+    --brand:#2563eb;--brand-soft:#e8efff;--side:#0f172a;--side-ink:#cbd5e1;
+    --ok:#15803d;--ok-soft:#dcfce7;--warn:#b45309;--warn-soft:#fef3c7;
+    --bad:#b91c1c;--bad-soft:#fee2e2;--info:#0e7490;--info-soft:#cffafe;--gray-soft:#eef0f4;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);
+       display:grid;grid-template-columns:232px 1fr;min-height:100vh;font-size:14px}
+  aside{background:var(--side);color:var(--side-ink);padding:20px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+  .logo{font-weight:700;font-size:19px;color:#fff;padding:2px 10px 20px;letter-spacing:.2px}
+  .logo span{color:#60a5fa}
+  .logo small{display:block;font-weight:400;font-size:11px;color:#94a3b8;margin-top:2px}
+  nav{display:flex;flex-direction:column;gap:2px}
+  nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:inherit;text-decoration:none}
+  nav a:hover{background:#1e293b}
+  nav a.active{background:var(--brand);color:#fff}
+  nav .ico{width:18px;text-align:center}
+  .side-foot{margin-top:auto;font-size:12px;color:#94a3b8;padding:10px}
+  .side-foot button{margin-top:8px;width:100%}
+  main{padding:26px 32px;min-width:0}
+  .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+  .top h1{margin:0;font-size:22px}
+  .top .who{display:flex;align-items:center;gap:10px;color:var(--muted)}
+  .avatar{width:34px;height:34px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:600}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .card h3{margin:0 0 14px;font-size:15px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+  .kpi .label{color:var(--muted);font-size:12.5px}
+  .kpi .value{font-size:24px;font-weight:700;margin:6px 0 2px}
+  .kpi .sub{font-size:12px;color:var(--muted)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  .toolbar .spacer{flex:1}
+  input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
+  .btn{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500}
+  .btn:hover{background:var(--gray-soft)}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+  .btn.primary:hover{filter:brightness(1.07)}
+  .btn.sm{padding:4px 10px;font-size:12.5px}
+  .btn.danger{color:var(--bad)}
+  .btn.ghost{background:transparent}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:10px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:600}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  td .actions{display:flex;gap:6px;justify-content:flex-end}
+  tbody tr:hover{background:#fafbfe}
+  .muted{color:var(--muted)}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .b-ok{background:var(--ok-soft);color:var(--ok)}
+  .b-warn{background:var(--warn-soft);color:var(--warn)}
+  .b-bad{background:var(--bad-soft);color:var(--bad)}
+  .b-info{background:var(--info-soft);color:var(--info)}
+  .b-gray{background:var(--gray-soft);color:var(--muted)}
+  .b-brand{background:var(--brand-soft);color:var(--brand)}
+  .bars{display:flex;flex-direction:column;gap:10px}
+  .bar-row{display:grid;grid-template-columns:150px 1fr 30px;gap:10px;align-items:center;font-size:13px}
+  .bar{height:10px;background:var(--gray-soft);border-radius:6px;overflow:hidden}
+  .bar>i{display:block;height:100%;background:var(--brand);border-radius:6px}
+  .feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;max-height:260px;overflow:auto}
+  .feed li{display:flex;gap:10px;font-size:13px}
+  .feed time{color:var(--muted);font-size:12px;white-space:nowrap;min-width:48px}
+  .plans{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+  .plan h4{margin:6px 0 2px;font-size:16px}
+  .plan .price{font-size:22px;font-weight:700;margin:10px 0 2px}
+  .plan ul{padding-left:18px;margin:10px 0;color:var(--muted)}
+  .plan footer{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+  .summary{display:flex;gap:24px;margin-bottom:14px;color:var(--muted)}
+  .summary b{color:var(--ink)}
+  .empty{padding:30px;text-align:center;color:var(--muted)}
+  /* Modal */
+  .overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:grid;place-items:center;z-index:20;padding:20px}
+  .modal{background:#fff;border-radius:14px;width:min(520px,100%);max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+  .modal.wide{width:min(720px,100%)}
+  .modal header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+  .modal header h3{margin:0;font-size:16px}
+  .modal-body{padding:18px 20px;display:grid;gap:12px}
+  .modal footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--line)}
+  .field{display:grid;gap:5px}
+  .field label{font-size:12.5px;font-weight:600;color:var(--muted)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .errors{margin:0 20px;padding:10px 12px;background:var(--bad-soft);color:var(--bad);border-radius:8px;font-size:13px}
+  .icon-btn{border:0;background:none;font-size:16px;cursor:pointer;color:var(--muted)}
+  /* Toast */
+  #toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:30}
+  .toast{background:#0f172a;color:#fff;padding:11px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.2);font-size:13px;border-left:4px solid #22c55e;animation:in .2s ease-out}
+  .toast.error{border-left-color:#ef4444}
+  @keyframes in{from{transform:translateY(8px);opacity:0}}
+  /* SOLID */
+  .solid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:16px}
+  .solid .letter{font-size:28px;font-weight:800;color:var(--brand);line-height:1}
+  .solid h4{margin:6px 0 4px;font-size:15px}
+  .solid p{margin:0 0 8px;color:var(--muted);font-size:13px}
+  .solid code,.mono{font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+  .solid ul{margin:0;padding-left:18px;font-size:13px}
+  .solid li{margin:3px 0}
+  pre{background:#0f172a;color:#e2e8f0;padding:14px;border-radius:10px;overflow:auto;font-size:12.5px;line-height:1.5;margin:0}
+  .layers{display:flex;flex-direction:column;gap:8px}
+  .layer{display:flex;gap:12px;align-items:center;padding:10px 14px;border:1px dashed var(--line);border-radius:10px}
+  .layer b{min-width:150px}
+  .layer .chips{display:flex;flex-wrap:wrap;gap:6px}
+  @media (max-width:1000px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+  @media (max-width:760px){body{grid-template-columns:1fr}aside{position:static;height:auto}}
+</style>
+</head>
+<body>
+  <aside>
+    <div class="logo">Conecta<span>Net</span><small>Panel de gestión ISP · mock</small></div>
+    <nav id="nav"></nav>
+    <div class="side-foot">
+      Los datos se guardan en este navegador (localStorage).
+      <button class="btn sm" id="reset">Restablecer datos demo</button>
+    </div>
+  </aside>
+  <main>
+    <div class="top">
+      <h1 id="title">Dashboard</h1>
+      <div class="who"><span id="period-label"></span><div class="avatar">AD</div></div>
+    </div>
+    <div id="outlet"></div>
+  </main>
+  <div id="modal-host"></div>
+  <div id="toasts"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+ * ConectaNet ISP — Mock con principios SOLID
+ * Capas:
+ *   1. Contratos (interfaces pequeñas → ISP)
+ *   2. Dominio (Plan y subtipos → LSP)
+ *   3. Infraestructura (repositorios, bus de eventos, notificadores, pasarelas)
+ *   4. Reglas de negocio extensibles (reglas de facturación → OCP)
+ *   5. Servicios de aplicación (una responsabilidad cada uno → SRP)
+ *   6. Presentación (vistas, router, modal, toast)
+ *   7. Raíz de composición: bootstrap() inyecta todo (→ DIP)
+ * ===================================================================== */
+
+/* ---------- Utilidades ---------- */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toDate = s => (typeof s === 'string' && s.length === 10) ? new Date(s + 'T00:00:00') : new Date(s);
+const round2 = n => Math.round(n * 100) / 100;
+const pad = (n, l = 2) => String(n).padStart(l, '0');
+const isoDay = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const monthsBetween = (a, b) => { a = toDate(a); b = toDate(b); return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()); };
+
+const Fmt = {
+  money: n => new Intl.NumberFormat('es-HN', { style: 'currency', currency: 'HNL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n),
+  date: s => toDate(s).toLocaleDateString('es-HN', { day: '2-digit', month: 'short', year: 'numeric' }),
+  dateTime: s => toDate(s).toLocaleString('es-HN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
+  time: s => toDate(s).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit' }),
+  period: p => { const [y, m] = p.split('-').map(Number); const t = new Date(y, m - 1, 1).toLocaleDateString('es-HN', { month: 'long', year: 'numeric' }); return t[0].toUpperCase() + t.slice(1); },
+};
+const Period = {
+  current() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; },
+  previous(p) { let [y, m] = p.split('-').map(Number); m--; if (!m) { m = 12; y--; } return `${y}-${pad(m)}`; },
+};
+
+/* =====================================================================
+ * 1. CONTRATOS — Interface Segregation Principle
+ *    Interfaces pequeñas y específicas: nadie depende de métodos que no usa.
+ * ===================================================================== */
+const Contract = (name, members) => Object.freeze({ name, members });
+const IReadable       = Contract('IReadable',       ['getAll', 'getById']);
+const IWritable       = Contract('IWritable',       ['save', 'remove']);
+const IIdGenerator    = Contract('IIdGenerator',    ['next']);
+const IEventBus       = Contract('IEventBus',       ['on', 'emit']);
+const INotifier       = Contract('INotifier',       ['channel', 'send']);
+const IPaymentGateway = Contract('IPaymentGateway', ['id', 'label', 'charge']);
+const IBillingRule    = Contract('IBillingRule',    ['applies', 'apply']);
+const IView           = Contract('IView',           ['render']);
+
+function assertImplements(obj, ...contracts) {
+  for (const c of contracts)
+    for (const m of c.members)
+      if (!(m in obj)) throw new TypeError(`${obj.constructor.name} no implementa ${c.name}.${m}`);
+  return obj;
+}
+
+class ValidationError extends Error {
+  constructor(errors) { super(errors.join(' ')); this.errors = errors; }
+}
+
+/* =====================================================================
+ * 2. DOMINIO — Liskov Substitution Principle
+ *    Cualquier subtipo de Plan puede usarse donde se espera un Plan.
+ * ===================================================================== */
+class Plan {
+  constructor({ id, name, down, up, price, type }) { Object.assign(this, { id, name, down: +down, up: +up, price: +price, type }); }
+  monthlyPrice()   { return this.price; }
+  technology()     { return 'Genérico'; }
+  installationFee(){ return 0; }
+  features()       { return [`${this.down} Mbps bajada / ${this.up} Mbps subida`]; }
+  toJSON()         { const { id, name, down, up, price, type } = this; return { id, name, down, up, price, type }; }
+}
+class FiberPlan extends Plan {
+  technology()      { return 'Fibra óptica (FTTH)'; }
+  installationFee() { return 800; }
+  features()        { return [...super.features(), 'Latencia < 5 ms', 'Router Wi‑Fi 6 incluido']; }
+}
+class WirelessPlan extends Plan {
+  technology()      { return 'Inalámbrico fijo'; }
+  installationFee() { return 500; }
+  features()        { return [...super.features(), 'Antena exterior incluida', 'Cobertura rural']; }
+}
+class DslPlan extends Plan {
+  technology()      { return 'ADSL / VDSL'; }
+  installationFee() { return 300; }
+  features()        { return [...super.features(), 'Sobre línea telefónica existente']; }
+}
+
+/* Fábrica abierta a extensión (OCP): un tipo de plan nuevo = una línea de register(). */
+class PlanFactory {
+  constructor() { this._types = new Map(); }
+  register(type, Cls, label) { this._types.set(type, { Cls, label }); return this; }
+  create(data) { const t = this._types.get(data.type); return new (t ? t.Cls : Plan)(data); }
+  types() { return [...this._types].map(([type, { label }]) => ({ type, label })); }
+  labelOf(type) { return this._types.get(type)?.label ?? type; }
+}
+
+/* =====================================================================
+ * 3. INFRAESTRUCTURA
+ * ===================================================================== */
+/* Repositorio en memoria: implementa IReadable + IWritable */
+class InMemoryRepository {
+  constructor(seed = [], hydrate = x => x) { this._items = new Map(seed.map(x => { const e = hydrate(x); return [e.id, e]; })); }
+  getAll()      { return [...this._items.values()]; }
+  getById(id)   { return this._items.get(id) ?? null; }
+  save(entity)  { this._items.set(entity.id, entity); return entity; }
+  remove(id)    { return this._items.delete(id); }
+}
+/* LSP: sustituye a InMemoryRepository sin romper a nadie, solo añade persistencia. */
+class LocalStorageRepository extends InMemoryRepository {
+  constructor(key, seed = [], hydrate) {
+    let stored = null;
+    try { stored = JSON.parse(localStorage.getItem(key)); } catch { /* sin storage */ }
+    super(Array.isArray(stored) ? stored : seed, hydrate);
+    this._key = key; this._persist();
+  }
+  save(e)   { const r = super.save(e); this._persist(); return r; }
+  remove(i) { const r = super.remove(i); this._persist(); return r; }
+  _persist(){ try { localStorage.setItem(this._key, JSON.stringify(this.getAll())); } catch { /* modo memoria */ } }
+}
+
+/* Generador de IDs: solo necesita LEER el repositorio (IReadable). */
+class SequentialIdGenerator {
+  constructor(reader, prefix, width = 4) { this.reader = reader; this.prefix = prefix; this.width = width; }
+  next() {
+    const max = this.reader.getAll().reduce((m, e) => Math.max(m, parseInt(String(e.id).split('-')[1], 10) || 0), 0);
+    return `${this.prefix}-${pad(max + 1, this.width)}`;
+  }
+}
+
+class EventBus {
+  constructor() { this._handlers = new Map(); }
+  on(evt, fn) { if (!this._handlers.has(evt)) this._handlers.set(evt, []); this._handlers.get(evt).push(fn); return this; }
+  emit(evt, payload) { [...(this._handlers.get(evt) || []), ...(this._handlers.get('*') || [])].forEach(fn => fn(payload, evt)); }
+}
+
+/* Bandeja simulada donde los notificadores "envían" mensajes. */
+class Outbox {
+  constructor(limit = 30) { this.items = []; this.limit = limit; }
+  push(msg) { this.items.unshift({ ...msg, at: new Date().toISOString() }); this.items.length = Math.min(this.items.length, this.limit); }
+  list() { return this.items; }
+}
+/* Notificadores: solo implementan INotifier (channel + send). */
+class EmailNotifier {
+  constructor(outbox) { this.outbox = outbox; }
+  get channel() { return 'Email'; }
+  send(client, message) { this.outbox.push({ channel: this.channel, to: client.email, message }); }
+}
+class SmsNotifier {
+  constructor(outbox) { this.outbox = outbox; }
+  get channel() { return 'SMS'; }
+  send(client, message) { this.outbox.push({ channel: this.channel, to: client.phone, message: message.slice(0, 70) }); }
+}
+
+/* Pasarelas de pago intercambiables (IPaymentGateway). */
+const ref = p => `${p}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+class CashGateway     { get id() { return 'cash'; }     get label() { return 'Efectivo (punto de pago)'; } charge(amount) { return { ok: amount > 0, reference: ref('EF'), message: 'Monto inválido' }; } }
+class CardGateway     { get id() { return 'card'; }     get label() { return 'Tarjeta crédito/débito'; }   charge(amount) { return amount > 0 ? { ok: true, reference: ref('TC') } : { ok: false, message: 'Transacción rechazada' }; } }
+class TransferGateway { get id() { return 'transfer'; } get label() { return 'Transferencia / PSE'; }      charge(amount) { return { ok: amount > 0, reference: ref('PSE'), message: 'Monto inválido' }; } }
+
+/* =====================================================================
+ * 4. REGLAS DE FACTURACIÓN — Open/Closed Principle
+ *    BillingService está CERRADO a modificación: para cambiar cómo se
+ *    factura se AÑADE una regla nueva que implemente IBillingRule.
+ * ===================================================================== */
+class PlanChargeRule {
+  applies() { return true; }
+  apply(ctx) { ctx.items.push({ concept: `Plan ${ctx.plan.name}`, amount: ctx.plan.monthlyPrice() }); }
+}
+class InstallationFeeRule {
+  constructor(invoiceReader) { this.invoices = invoiceReader; }
+  applies(ctx) { return ctx.plan.installationFee() > 0 && !this.invoices.getAll().some(i => i.clientId === ctx.client.id); }
+  apply(ctx) { ctx.items.push({ concept: `Instalación · ${ctx.plan.technology()}`, amount: ctx.plan.installationFee() }); }
+}
+class LoyaltyDiscountRule {
+  constructor(minMonths = 12, pct = 0.10) { this.minMonths = minMonths; this.pct = pct; }
+  applies(ctx) { return monthsBetween(ctx.client.since, `${ctx.period}-01`) >= this.minMonths; }
+  apply(ctx) { ctx.items.push({ concept: `Descuento fidelidad ${this.pct * 100}%`, amount: -round2(ctx.plan.monthlyPrice() * this.pct) }); }
+}
+class TaxRule {
+  constructor(rate = 0.15) { this.rate = rate; }
+  applies() { return true; }
+  apply(ctx) {
+    const subtotal = ctx.items.reduce((s, i) => s + i.amount, 0);
+    ctx.items.push({ concept: `ISV ${this.rate * 100}%`, amount: round2(subtotal * this.rate) });
+  }
+}
+
+/* SLA de soporte: política separada del servicio de tickets (SRP). */
+class SlaPolicy {
+  constructor(hours = { alta: 4, media: 24, baja: 72 }) { this.hours = hours; }
+  dueDate(priority, from) { return new Date(toDate(from).getTime() + (this.hours[priority] ?? 72) * 3600e3).toISOString(); }
+  isBreached(t) { return !['resuelto', 'cerrado'].includes(t.status) && new Date(t.dueAt) < new Date(); }
+}
+
+/* =====================================================================
+ * 5. SERVICIOS — Single Responsibility Principle
+ *    Cada servicio tiene una única razón para cambiar.
+ *    Todos reciben sus dependencias por constructor (DIP).
+ * ===================================================================== */
+class ClientValidator {
+  constructor(planReader) { this.plans = planReader; }
+  validate(d) {
+    const e = [];
+    if ((d.name || '').trim().length < 3) e.push('El nombre debe tener al menos 3 caracteres.');
+    if (!/^\d{6,12}$/.test(d.document || '')) e.push('El documento debe tener entre 6 y 12 dígitos.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email || '')) e.push('El correo no es válido.');
+    if (!/^\+?\d{7,13}$/.test((d.phone || '').replace(/[\s-]/g, ''))) e.push('El teléfono no es válido.');
+    if (!(d.address || '').trim()) e.push('La dirección es obligatoria.');
+    if (!this.plans.getById(d.planId)) e.push('Selecciona un plan válido.');
+    return e;
+  }
+}
+
+class ClientService {
+  constructor({ reader, writer, validator, ids, bus }) { Object.assign(this, { reader, writer, validator, ids, bus }); }
+  list(q = '') {
+    q = q.trim().toLowerCase();
+    return this.reader.getAll().filter(c => !q || [c.id, c.name, c.document, c.email, c.address].some(v => String(v).toLowerCase().includes(q)));
+  }
+  get(id) { return this.reader.getById(id); }
+  create(data) {
+    const errors = this.validator.validate(data);
+    if (errors.length) throw new ValidationError(errors);
+    const c = { id: this.ids.next(), name: data.name.trim(), document: data.document, email: data.email.trim(), phone: data.phone.trim(),
+                address: data.address.trim(), planId: data.planId, since: data.since || isoDay(new Date()), status: 'activo' };
+    this.writer.save(c); this.bus.emit('client:created', c); return c;
+  }
+  update(id, data) {
+    const current = this._require(id);
+    const next = { ...current, ...data, id };
+    const errors = this.validator.validate(next);
+    if (errors.length) throw new ValidationError(errors);
+    const planChanged = current.planId !== next.planId;
+    this.writer.save(next); this.bus.emit(planChanged ? 'client:plan-changed' : 'client:updated', next); return next;
+  }
+  toggleStatus(id) {
+    const c = this._require(id);
+    const next = { ...c, status: c.status === 'activo' ? 'suspendido' : 'activo' };
+    this.writer.save(next); this.bus.emit('client:status', next); return next;
+  }
+  remove(id) { const c = this._require(id); this.writer.remove(id); this.bus.emit('client:removed', c); }
+  _require(id) { const c = this.reader.getById(id); if (!c) throw new Error('Cliente no encontrado'); return c; }
+}
+
+class PlanService {
+  constructor({ reader, writer, factory, ids, clients, bus }) { Object.assign(this, { reader, writer, factory, ids, clients, bus }); }
+  list() { return this.reader.getAll().sort((a, b) => a.price - b.price); }
+  get(id) { return this.reader.getById(id); }
+  types() { return this.factory.types(); }
+  typeLabel(t) { return this.factory.labelOf(t); }
+  subscribers(planId) { return this.clients.getAll().filter(c => c.planId === planId).length; }
+  create(d) {
+    const e = [];
+    if ((d.name || '').trim().length < 3) e.push('El nombre del plan es obligatorio.');
+    if (!this.factory.types().some(t => t.type === d.type)) e.push('Tipo de plan inválido.');
+    ['down', 'up', 'price'].forEach(k => { if (!(+d[k] > 0)) e.push(`El campo "${({ down: 'Bajada', up: 'Subida', price: 'Precio' })[k]}" debe ser mayor a 0.`); });
+    if (e.length) throw new ValidationError(e);
+    const plan = this.factory.create({ ...d, id: this.ids.next(), name: d.name.trim() });
+    this.writer.save(plan); this.bus.emit('plan:created', plan); return plan;
+  }
+  remove(id) {
+    if (this.subscribers(id) > 0) throw new Error('No se puede eliminar: el plan tiene clientes asignados.');
+    const p = this.reader.getById(id); this.writer.remove(id); this.bus.emit('plan:removed', p);
+  }
+}
+
+class BillingService {
+  constructor({ invoices, clients, plans, rules, ids, bus }) {
+    rules.forEach(r => assertImplements(r, IBillingRule));
+    Object.assign(this, { invoices, clients, plans, rules, ids, bus });
+  }
+  list({ period, status } = {}) {
+    return this.invoices.getAll()
+      .filter(i => (!period || i.period === period) && (!status || status === 'todas' || this.statusOf(i) === status))
+      .sort((a, b) => b.id.localeCompare(a.id));
+  }
+  get(id) { return this.invoices.getById(id); }
+  statusOf(inv) { return inv.status === 'pendiente' && new Date(inv.dueAt) < new Date() ? 'vencida' : inv.status; }
+  generate(clientId, period) {
+    const client = this.clients.getById(clientId);
+    if (!client || client.status !== 'activo') return null;
+    if (this.invoices.getAll().some(i => i.clientId === clientId && i.period === period)) return null;
+    const plan = this.plans.getById(client.planId);
+    if (!plan) return null;
+    const ctx = { client, plan, period, items: [] };
+    this.rules.filter(r => r.applies(ctx)).forEach(r => r.apply(ctx));
+    const inv = { id: this.ids.next(), clientId, period, items: ctx.items, total: round2(ctx.items.reduce((s, i) => s + i.amount, 0)),
+                  status: 'pendiente', issuedAt: `${period}-01`, dueAt: `${period}-15T23:59:59` };
+    this.invoices.save(inv); this.bus.emit('invoice:created', { invoice: inv, client }); return inv;
+  }
+  generateAll(period) {
+    const created = this.clients.getAll().map(c => this.generate(c.id, period)).filter(Boolean);
+    this.bus.emit('billing:batch', { period, count: created.length }); return created;
+  }
+}
+
+class PaymentService {
+  constructor({ invoices, clients, gateways, bus }) {
+    gateways.forEach(g => assertImplements(g, IPaymentGateway));
+    Object.assign(this, { invoices, clients, gateways, bus });
+  }
+  methods() { return this.gateways.map(g => ({ id: g.id, label: g.label })); }
+  pay(invoiceId, gatewayId) {
+    const inv = this.invoices.getById(invoiceId);
+    if (!inv) throw new Error('Factura no encontrada');
+    if (inv.status === 'pagada') throw new Error('La factura ya está pagada');
+    const gw = this.gateways.find(g => g.id === gatewayId);
+    if (!gw) throw new ValidationError(['Selecciona un medio de pago.']);
+    const r = gw.charge(inv.total, inv);
+    if (!r.ok) { this.bus.emit('payment:failed', { invoice: inv, reason: r.message }); throw new Error(r.message); }
+    const paid = { ...inv, status: 'pagada', paidAt: new Date().toISOString(), method: gw.label, reference: r.reference };
+    this.invoices.save(paid);
+    this.bus.emit('payment:received', { invoice: paid, client: this.clients.getById(inv.clientId) });
+    return paid;
+  }
+}
+
+class TicketService {
+  constructor({ reader, writer, ids, sla, clients, bus }) { Object.assign(this, { reader, writer, ids, sla, clients, bus }); }
+  list(status = 'todos') { return this.reader.getAll().filter(t => status === 'todos' || t.status === status).sort((a, b) => b.id.localeCompare(a.id)); }
+  open(d) {
+    const e = [];
+    const client = this.clients.getById(d.clientId);
+    if (!client) e.push('Selecciona un cliente.');
+    if ((d.subject || '').trim().length < 5) e.push('Describe el problema (mín. 5 caracteres).');
+    if (!['alta', 'media', 'baja'].includes(d.priority)) e.push('Prioridad inválida.');
+    if (e.length) throw new ValidationError(e);
+    const now = new Date().toISOString();
+    const t = { id: this.ids.next(), clientId: d.clientId, subject: d.subject.trim(), category: d.category, priority: d.priority,
+                status: 'abierto', createdAt: now, dueAt: this.sla.dueDate(d.priority, now) };
+    this.writer.save(t); this.bus.emit('ticket:created', { ticket: t, client }); return t;
+  }
+  changeStatus(id, status) {
+    const t = this.reader.getById(id); if (!t) throw new Error('Ticket no encontrado');
+    const next = { ...t, status }; this.writer.save(next);
+    this.bus.emit('ticket:status', { ticket: next, client: this.clients.getById(t.clientId) }); return next;
+  }
+  isBreached(t) { return this.sla.isBreached(t); }
+}
+
+/* ISP en acción: ReportService SOLO recibe lectores (IReadable). No puede escribir nada. */
+class ReportService {
+  constructor({ clients, plans, invoices, tickets, sla, billing }) { Object.assign(this, { clients, plans, invoices, tickets, sla, billing }); }
+  summary(period = Period.current()) {
+    const clients = this.clients.getAll(), invoices = this.invoices.getAll(), tickets = this.tickets.getAll();
+    const active = clients.filter(c => c.status === 'activo');
+    const mrr = active.reduce((s, c) => s + (this.plans.getById(c.planId)?.monthlyPrice() ?? 0), 0);
+    const unpaid = invoices.filter(i => i.status !== 'pagada');
+    const openT = tickets.filter(t => !['resuelto', 'cerrado'].includes(t.status));
+    const distribution = this.plans.getAll().map(p => ({ plan: p, count: clients.filter(c => c.planId === p.id).length })).sort((a, b) => b.count - a.count);
+    return {
+      active: active.length, suspended: clients.length - active.length, mrr,
+      pending: unpaid.reduce((s, i) => s + i.total, 0),
+      overdue: unpaid.filter(i => this.billing.statusOf(i) === 'vencida').length,
+      collected: invoices.filter(i => i.status === 'pagada' && i.paidAt?.startsWith(period)).reduce((s, i) => s + i.total, 0),
+      openTickets: openT.length, breached: openT.filter(t => this.sla.isBreached(t)).length, distribution,
+    };
+  }
+}
+
+/* Envía notificaciones a través de CUALQUIER INotifier inyectado (DIP + OCP). */
+class NotificationService {
+  constructor({ notifiers, bus }) {
+    notifiers.forEach(n => assertImplements(n, INotifier));
+    this.notifiers = notifiers;
+    bus.on('invoice:created',  ({ invoice, client }) => this._notify(client, `Hola ${client.name.split(' ')[0]}, tu factura ${invoice.id} por ${Fmt.money(invoice.total)} ya está disponible.`))
+       .on('payment:received', ({ invoice, client }) => client && this._notify(client, `Recibimos tu pago de ${Fmt.money(invoice.total)} (factura ${invoice.id}). ¡Gracias!`))
+       .on('ticket:created',   ({ ticket, client })  => this._notify(client, `Abrimos el ticket ${ticket.id}: "${ticket.subject}". Te mantendremos informado.`))
+       .on('client:status',    c => c.status === 'suspendido' && this._notify(c, `Tu servicio ha sido suspendido. Comunícate con soporte.`));
+  }
+  _notify(client, msg) { this.notifiers.forEach(n => n.send(client, msg)); }
+}
+
+/* Registro de actividad: escucha eventos y los traduce a texto. */
+class ActivityLog {
+  constructor(bus, limit = 25) {
+    this.items = []; this.limit = limit;
+    const fmt = {
+      'client:created':       c => `Nuevo cliente <b>${esc(c.name)}</b> (${c.id})`,
+      'client:updated':       c => `Datos actualizados de <b>${esc(c.name)}</b>`,
+      'client:plan-changed':  c => `<b>${esc(c.name)}</b> cambió de plan`,
+      'client:status':        c => `<b>${esc(c.name)}</b> pasó a <b>${c.status}</b>`,
+      'client:removed':       c => `Cliente <b>${esc(c.name)}</b> eliminado`,
+      'plan:created':         p => `Nuevo plan <b>${esc(p.name)}</b>`,
+      'plan:removed':         p => `Plan <b>${esc(p.name)}</b> eliminado`,
+      'billing:batch':        b => `Facturación de ${Fmt.period(b.period)}: <b>${b.count}</b> facturas generadas`,
+      'payment:received':     ({ invoice }) => `Pago de <b>${Fmt.money(invoice.total)}</b> en ${invoice.id} (${esc(invoice.method)})`,
+      'payment:failed':       ({ invoice, reason }) => `Pago rechazado en ${invoice.id}: ${esc(reason)}`,
+      'ticket:created':       ({ ticket }) => `Ticket <b>${ticket.id}</b> abierto (${ticket.priority})`,
+      'ticket:status':        ({ ticket }) => `Ticket <b>${ticket.id}</b> → ${TICKET_STATUS[ticket.status].label}`,
+    };
+    bus.on('*', (payload, evt) => { if (fmt[evt]) this._add(fmt[evt](payload)); });
+  }
+  _add(html) { this.items.unshift({ html, at: new Date().toISOString() }); this.items.length = Math.min(this.items.length, this.limit); }
+  list() { return this.items; }
+}
+
+/* =====================================================================
+ * 6. PRESENTACIÓN — cada vista solo sabe pintar y delegar en servicios.
+ * ===================================================================== */
+const CLIENT_STATUS  = { activo: { label: 'Activo', cls: 'b-ok' }, suspendido: { label: 'Suspendido', cls: 'b-bad' } };
+const INVOICE_STATUS = { pendiente: { label: 'Pendiente', cls: 'b-warn' }, vencida: { label: 'Vencida', cls: 'b-bad' }, pagada: { label: 'Pagada', cls: 'b-ok' } };
+const TICKET_STATUS  = { abierto: { label: 'Abierto', cls: 'b-info' }, en_progreso: { label: 'En progreso', cls: 'b-warn' }, resuelto: { label: 'Resuelto', cls: 'b-ok' }, cerrado: { label: 'Cerrado', cls: 'b-gray' } };
+const PRIORITY       = { alta: { label: 'Alta', cls: 'b-bad' }, media: { label: 'Media', cls: 'b-warn' }, baja: { label: 'Baja', cls: 'b-gray' } };
+const badge = (map, key) => `<span class="badge ${map[key]?.cls ?? 'b-gray'}">${esc(map[key]?.label ?? key)}</span>`;
+const options = (list, selected) => list.map(o => `<option value="${esc(o.value)}" ${o.value === selected ? 'selected' : ''}>${esc(o.label)}</option>`).join('');
+
+class Toast {
+  constructor(host) { this.host = host; }
+  show(msg, type = 'ok') { const el = document.createElement('div'); el.className = `toast ${type}`; el.textContent = msg; this.host.append(el); setTimeout(() => el.remove(), 3200); }
+}
+
+class Modal {
+  constructor(host) { this.host = host; }
+  open({ title, body, submitLabel = 'Guardar', onSubmit, wide = false }) {
+    this.host.innerHTML = `
+      <div class="overlay"><form class="modal ${wide ? 'wide' : ''}" novalidate>
+        <header><h3>${esc(title)}</h3><button type="button" class="icon-btn" data-close aria-label="Cerrar">✕</button></header>
+        <div class="modal-body">${body}</div>
+        <div class="errors" hidden></div>
+        <footer><button type="button" class="btn ghost" data-close>${onSubmit ? 'Cancelar' : 'Cerrar'}</button>
+          ${onSubmit ? `<button class="btn primary">${esc(submitLabel)}</button>` : ''}</footer>
+      </form></div>`;
+    const form = this.host.querySelector('form');
+    this.host.querySelectorAll('[data-close]').forEach(b => b.onclick = () => this.close());
+    this.host.querySelector('.overlay').onmousedown = e => { if (e.target.classList.contains('overlay')) this.close(); };
+    form.onsubmit = e => {
+      e.preventDefault();
+      try { onSubmit?.(Object.fromEntries(new FormData(form))); this.close(); }
+      catch (err) { const box = form.querySelector('.errors'); box.hidden = false; box.innerHTML = (err.errors || [err.message]).map(m => `<div>• ${esc(m)}</div>`).join(''); }
+    };
+    this._esc = e => e.key === 'Escape' && this.close();
+    document.addEventListener('keydown', this._esc);
+    form.querySelector('input,select,textarea')?.focus();
+  }
+  close() { this.host.innerHTML = ''; document.removeEventListener('keydown', this._esc); }
+}
+
+/* Clase base de vista: plantilla + enlace de eventos por delegación. */
+class View {
+  constructor(deps) { Object.assign(this, deps); }
+  render(root) { this.root = root; root.innerHTML = this.template(); root.onclick = e => this._dispatch(e, 'click'); root.onchange = e => this._dispatch(e, 'change'); this.afterRender?.(); }
+  refresh() { this.render(this.root); }
+  _dispatch(e, type) {
+    const el = e.target.closest(`[data-${type === 'click' ? 'action' : 'change'}]`);
+    if (!el || !this.root.contains(el)) return;
+    const name = el.dataset[type === 'click' ? 'action' : 'change'];
+    try { this.actions?.[name]?.call(this, el.dataset.id, el); }
+    catch (err) { this.toast.show(err.message, 'error'); }
+  }
+}
+
+class DashboardView extends View {
+  template() {
+    const s = this.reports.summary();
+    const max = Math.max(1, ...s.distribution.map(d => d.count));
+    const act = this.activity.list(), out = this.outbox.list().slice(0, 8);
+    return `
+      <div class="kpis">
+        <div class="card kpi"><div class="label">Clientes activos</div><div class="value">${s.active}</div><div class="sub">${s.suspended} suspendidos</div></div>
+        <div class="card kpi"><div class="label">Ingreso mensual recurrente</div><div class="value">${Fmt.money(s.mrr)}</div><div class="sub">antes de impuestos</div></div>
+        <div class="card kpi"><div class="label">Cartera pendiente</div><div class="value">${Fmt.money(s.pending)}</div><div class="sub">${s.overdue} facturas vencidas</div></div>
+        <div class="card kpi"><div class="label">Tickets abiertos</div><div class="value">${s.openTickets}</div><div class="sub">${s.breached} fuera de SLA</div></div>
+      </div>
+      <div class="grid2">
+        <section class="card"><h3>Clientes por plan</h3><div class="bars">
+          ${s.distribution.map(d => `<div class="bar-row"><span>${esc(d.plan.name)}</span><div class="bar"><i style="width:${d.count / max * 100}%"></i></div><b class="num">${d.count}</b></div>`).join('')}
+        </div></section>
+        <section class="card"><h3>Actividad reciente</h3>
+          ${act.length ? `<ul class="feed">${act.map(a => `<li><time>${Fmt.time(a.at)}</time><span>${a.html}</span></li>`).join('')}</ul>`
+                       : `<div class="empty">Sin actividad en esta sesión. Crea un cliente, genera facturas o abre un ticket.</div>`}
+        </section>
+      </div>
+      <section class="card"><h3>Notificaciones enviadas <span class="badge b-gray">simuladas</span></h3>
+        ${out.length ? `<table><thead><tr><th>Canal</th><th>Destino</th><th>Mensaje</th><th>Hora</th></tr></thead><tbody>
+          ${out.map(n => `<tr><td><span class="badge ${n.channel === 'Email' ? 'b-brand' : 'b-info'}">${n.channel}</span></td><td class="mono">${esc(n.to)}</td><td>${esc(n.message)}</td><td class="muted">${Fmt.time(n.at)}</td></tr>`).join('')}
+        </tbody></table>` : `<div class="empty">Aún no se han enviado notificaciones.</div>`}
+      </section>`;
+  }
+}
+
+class ClientsView extends View {
+  template() {
+    return `
+      <div class="toolbar">
+        <input id="q" type="search" placeholder="Buscar por nombre, documento, correo…" style="min-width:300px" value="${esc(this.q || '')}">
+        <span class="spacer"></span>
+        <button class="btn primary" data-action="new">+ Nuevo cliente</button>
+      </div>
+      <div class="card" style="padding:0 6px"><table>
+        <thead><tr><th>ID</th><th>Cliente</th><th>Contacto</th><th>Plan</th><th>Cliente desde</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>`;
+  }
+  afterRender() {
+    const q = this.root.querySelector('#q');
+    q.oninput = () => { this.q = q.value; this.renderRows(); };
+    this.renderRows();
+  }
+  renderRows() {
+    const list = this.clients.list(this.q || '');
+    this.root.querySelector('#rows').innerHTML = list.length ? list.map(c => {
+      const p = this.plans.get(c.planId);
+      return `<tr>
+        <td class="mono muted">${c.id}</td>
+        <td><b>${esc(c.name)}</b><div class="muted">CC ${esc(c.document)} · ${esc(c.address)}</div></td>
+        <td>${esc(c.email)}<div class="muted">${esc(c.phone)}</div></td>
+        <td>${p ? esc(p.name) : '<span class="muted">—</span>'}</td>
+        <td>${Fmt.date(c.since)}</td>
+        <td>${badge(CLIENT_STATUS, c.status)}</td>
+        <td><div class="actions">
+          <button class="btn sm" data-action="edit" data-id="${c.id}">Editar</button>
+          <button class="btn sm" data-action="toggle" data-id="${c.id}">${c.status === 'activo' ? 'Suspender' : 'Reactivar'}</button>
+          <button class="btn sm danger" data-action="remove" data-id="${c.id}">Eliminar</button>
+        </div></td></tr>`;
+    }).join('') : `<tr><td colspan="7" class="empty">No hay clientes que coincidan.</td></tr>`;
+  }
+  form(c = {}) {
+    const plans = this.plans.list().map(p => ({ value: p.id, label: `${p.name} — ${Fmt.money(p.price)}` }));
+    return `
+      <div class="field"><label>Nombre completo</label><input name="name" value="${esc(c.name)}"></div>
+      <div class="row2">
+        <div class="field"><label>Documento</label><input name="document" inputmode="numeric" value="${esc(c.document)}"></div>
+        <div class="field"><label>Teléfono</label><input name="phone" value="${esc(c.phone)}"></div>
+      </div>
+      <div class="field"><label>Correo</label><input name="email" type="email" value="${esc(c.email)}"></div>
+      <div class="field"><label>Dirección de instalación</label><input name="address" value="${esc(c.address)}"></div>
+      <div class="row2">
+        <div class="field"><label>Plan</label><select name="planId"><option value="">Selecciona…</option>${options(plans, c.planId)}</select></div>
+        <div class="field"><label>Cliente desde</label><input name="since" type="date" value="${esc(c.since || isoDay(new Date()))}"></div>
+      </div>`;
+  }
+  actions = {
+    new()   { this.modal.open({ title: 'Nuevo cliente', body: this.form(), submitLabel: 'Crear cliente', onSubmit: d => { const c = this.clients.create(d); this.toast.show(`Cliente ${c.name} creado`); this.refresh(); } }); },
+    edit(id){ const c = this.clients.get(id); this.modal.open({ title: `Editar ${c.name}`, body: this.form(c), onSubmit: d => { this.clients.update(id, d); this.toast.show('Cliente actualizado'); this.refresh(); } }); },
+    toggle(id) { const c = this.clients.toggleStatus(id); this.toast.show(`${c.name}: ${c.status}`); this.renderRows(); },
+    remove(id) { const c = this.clients.get(id); if (confirm(`¿Eliminar a ${c.name}?`)) { this.clients.remove(id); this.toast.show('Cliente eliminado'); this.renderRows(); } },
+  };
+}
+
+class PlansView extends View {
+  template() {
+    return `
+      <div class="toolbar"><span class="muted">Los tipos de plan disponibles se registran en <span class="mono">PlanFactory</span> (abierto a extensión).</span>
+        <span class="spacer"></span><button class="btn primary" data-action="new">+ Nuevo plan</button></div>
+      <div class="plans">${this.plans.list().map(p => `
+        <div class="card plan">
+          <span class="badge b-brand">${esc(this.plans.typeLabel(p.type))}</span>
+          <h4>${esc(p.name)}</h4><div class="muted">${esc(p.technology())}</div>
+          <div class="price">${Fmt.money(p.monthlyPrice())}<span class="muted" style="font-size:13px;font-weight:400"> /mes</span></div>
+          <div class="muted">Instalación: ${Fmt.money(p.installationFee())}</div>
+          <ul>${p.features().map(f => `<li>${esc(f)}</li>`).join('')}</ul>
+          <footer><span><b>${this.plans.subscribers(p.id)}</b> <span class="muted">clientes</span></span>
+            <button class="btn sm danger" data-action="remove" data-id="${p.id}">Eliminar</button></footer>
+        </div>`).join('')}</div>`;
+  }
+  actions = {
+    new() {
+      const types = this.plans.types().map(t => ({ value: t.type, label: t.label }));
+      this.modal.open({ title: 'Nuevo plan', submitLabel: 'Crear plan', body: `
+        <div class="field"><label>Tipo de tecnología</label><select name="type">${options(types, 'fibra')}</select></div>
+        <div class="field"><label>Nombre comercial</label><input name="name" placeholder="Ej. Fibra Gamer 800"></div>
+        <div class="row2"><div class="field"><label>Bajada (Mbps)</label><input name="down" type="number" min="1"></div>
+          <div class="field"><label>Subida (Mbps)</label><input name="up" type="number" min="1"></div></div>
+        <div class="field"><label>Precio mensual (L, sin ISV)</label><input name="price" type="number" min="1" step="0.01"></div>`,
+        onSubmit: d => { const p = this.plans.create(d); this.toast.show(`Plan ${p.name} creado`); this.refresh(); } });
+    },
+    remove(id) { const p = this.plans.get(id); if (confirm(`¿Eliminar el plan ${p.name}?`)) { this.plans.remove(id); this.toast.show('Plan eliminado'); this.refresh(); } },
+  };
+}
+
+class BillingView extends View {
+  period = Period.current(); status = 'todas';
+  template() {
+    const list = this.billing.list({ period: this.period, status: this.status });
+    const total = list.reduce((s, i) => s + i.total, 0);
+    const paid = list.filter(i => i.status === 'pagada').reduce((s, i) => s + i.total, 0);
+    const st = [{ value: 'todas', label: 'Todos los estados' }, ...Object.entries(INVOICE_STATUS).map(([value, v]) => ({ value, label: v.label }))];
+    return `
+      <div class="toolbar">
+        <input type="month" value="${this.period}" data-change="period">
+        <select data-change="status">${options(st, this.status)}</select>
+        <span class="spacer"></span>
+        <button class="btn primary" data-action="generate">Generar facturación de ${Fmt.period(this.period)}</button>
+      </div>
+      <div class="summary"><span>Facturas: <b>${list.length}</b></span><span>Facturado: <b>${Fmt.money(total)}</b></span>
+        <span>Recaudado: <b>${Fmt.money(paid)}</b></span><span>Pendiente: <b>${Fmt.money(total - paid)}</b></span></div>
+      <div class="card" style="padding:0 6px"><table>
+        <thead><tr><th>N.º</th><th>Cliente</th><th>Período</th><th class="num">Total</th><th>Vence</th><th>Estado</th><th></th></tr></thead>
+        <tbody>${list.length ? list.map(i => {
+          const c = this.clients.get(i.clientId); const s = this.billing.statusOf(i);
+          return `<tr><td class="mono">${i.id}</td><td>${c ? esc(c.name) : '<span class="muted">Cliente eliminado</span>'}</td><td>${Fmt.period(i.period)}</td>
+            <td class="num"><b>${Fmt.money(i.total)}</b></td><td>${Fmt.date(i.dueAt)}</td><td>${badge(INVOICE_STATUS, s)}</td>
+            <td><div class="actions"><button class="btn sm" data-action="detail" data-id="${i.id}">Ver</button>
+            ${s !== 'pagada' ? `<button class="btn sm primary" data-action="pay" data-id="${i.id}">Registrar pago</button>` : ''}</div></td></tr>`;
+        }).join('') : `<tr><td colspan="7" class="empty">No hay facturas para ${Fmt.period(this.period)}. Usa “Generar facturación”.</td></tr>`}</tbody>
+      </table></div>`;
+  }
+  actions = {
+    period(_, el) { if (el.value) { this.period = el.value; this.refresh(); } },
+    status(_, el) { this.status = el.value; this.refresh(); },
+    generate() {
+      const created = this.billing.generateAll(this.period);
+      this.toast.show(created.length ? `${created.length} facturas generadas` : 'No hay facturas nuevas que generar (ya existen o no hay clientes activos)', created.length ? 'ok' : 'error');
+      this.refresh();
+    },
+    detail(id) {
+      const i = this.billing.get(id), c = this.clients.get(i.clientId);
+      this.modal.open({ title: `Factura ${i.id}`, wide: true, body: `
+        <div class="row2"><div><div class="muted">Cliente</div><b>${c ? esc(c.name) : '—'}</b><div class="muted">${c ? esc(c.address) : ''}</div></div>
+          <div><div class="muted">Período</div><b>${Fmt.period(i.period)}</b><div>${badge(INVOICE_STATUS, this.billing.statusOf(i))}</div></div></div>
+        <table><thead><tr><th>Concepto</th><th class="num">Valor</th></tr></thead><tbody>
+          ${i.items.map(it => `<tr><td>${esc(it.concept)}</td><td class="num">${Fmt.money(it.amount)}</td></tr>`).join('')}
+          <tr><td><b>Total</b></td><td class="num"><b>${Fmt.money(i.total)}</b></td></tr></tbody></table>
+        ${i.status === 'pagada' ? `<div class="muted">Pagada el ${Fmt.dateTime(i.paidAt)} · ${esc(i.method)} · Ref. <span class="mono">${esc(i.reference)}</span></div>` : ''}
+        <div class="muted" style="font-size:12px">Cada línea la produjo una <span class="mono">IBillingRule</span> distinta.</div>` });
+    },
+    pay(id) {
+      const i = this.billing.get(id);
+      const methods = this.payments.methods().map(m => ({ value: m.id, label: m.label }));
+      this.modal.open({ title: `Registrar pago · ${i.id}`, submitLabel: `Cobrar ${Fmt.money(i.total)}`, body: `
+        <div class="field"><label>Medio de pago</label><select name="gateway"><option value="">Selecciona…</option>${options(methods)}</select></div>
+        <div class="muted">Las pasarelas son intercambiables: cada una implementa <span class="mono">IPaymentGateway</span>.</div>`,
+        onSubmit: d => { const p = this.payments.pay(id, d.gateway); this.toast.show(`Pago aprobado · Ref. ${p.reference}`); this.refresh(); } });
+    },
+  };
+}
+
+class SupportView extends View {
+  filter = 'todos';
+  template() {
+    const list = this.tickets.list(this.filter);
+    const filters = [{ value: 'todos', label: 'Todos' }, ...Object.entries(TICKET_STATUS).map(([value, v]) => ({ value, label: v.label }))];
+    const statuses = Object.entries(TICKET_STATUS).map(([value, v]) => ({ value, label: v.label }));
+    return `
+      <div class="toolbar"><select data-change="filter">${options(filters, this.filter)}</select>
+        <span class="muted">SLA: alta 4 h · media 24 h · baja 72 h</span><span class="spacer"></span>
+        <button class="btn primary" data-action="new">+ Nuevo ticket</button></div>
+      <div class="card" style="padding:0 6px"><table>
+        <thead><tr><th>ID</th><th>Cliente</th><th>Asunto</th><th>Categoría</th><th>Prioridad</th><th>Creado</th><th>SLA</th><th>Estado</th></tr></thead>
+        <tbody>${list.length ? list.map(t => {
+          const c = this.clients.get(t.clientId); const breached = this.tickets.isBreached(t);
+          return `<tr><td class="mono">${t.id}</td><td>${c ? esc(c.name) : '—'}</td><td>${esc(t.subject)}</td><td>${esc(t.category)}</td>
+            <td>${badge(PRIORITY, t.priority)}</td><td class="muted">${Fmt.dateTime(t.createdAt)}</td>
+            <td>${['resuelto', 'cerrado'].includes(t.status) ? '<span class="muted">—</span>' : breached ? '<span class="badge b-bad">Vencido</span>' : `<span class="muted">${Fmt.dateTime(t.dueAt)}</span>`}</td>
+            <td><select data-change="status" data-id="${t.id}">${options(statuses, t.status)}</select></td></tr>`;
+        }).join('') : `<tr><td colspan="8" class="empty">No hay tickets.</td></tr>`}</tbody>
+      </table></div>`;
+  }
+  actions = {
+    filter(_, el) { this.filter = el.value; this.refresh(); },
+    status(id, el) { this.tickets.changeStatus(id, el.value); this.toast.show(`Ticket ${id} actualizado`); this.refresh(); },
+    new() {
+      const clients = this.clients.list().map(c => ({ value: c.id, label: `${c.name} (${c.id})` }));
+      const cats = ['Sin conexión', 'Lentitud', 'Facturación', 'Cambio de plan', 'Instalación', 'Otro'].map(v => ({ value: v, label: v }));
+      this.modal.open({ title: 'Nuevo ticket de soporte', submitLabel: 'Abrir ticket', body: `
+        <div class="field"><label>Cliente</label><select name="clientId"><option value="">Selecciona…</option>${options(clients)}</select></div>
+        <div class="row2"><div class="field"><label>Categoría</label><select name="category">${options(cats, 'Sin conexión')}</select></div>
+          <div class="field"><label>Prioridad</label><select name="priority">${options(Object.entries(PRIORITY).map(([value, v]) => ({ value, label: v.label })), 'media')}</select></div></div>
+        <div class="field"><label>Descripción</label><textarea name="subject" rows="3" placeholder="Ej. El cliente reporta intermitencia desde ayer"></textarea></div>`,
+        onSubmit: d => { const t = this.tickets.open(d); this.toast.show(`Ticket ${t.id} abierto`); this.refresh(); } });
+    },
+  };
+}
+
+class SolidView extends View {
+  template() {
+    const checks = this.contractChecks.map(({ name, obj, contracts }) => {
+      let ok = true, err = '';
+      try { assertImplements(obj, ...contracts); } catch (e) { ok = false; err = e.message; }
+      return `<tr><td class="mono">${esc(name)}</td><td>${contracts.map(c => `<span class="badge b-brand mono">${c.name}</span>`).join(' ')}</td>
+        <td>${ok ? '<span class="badge b-ok">✓ Cumple</span>' : `<span class="badge b-bad">${esc(err)}</span>`}</td></tr>`;
+    }).join('');
+    const chips = arr => `<div class="chips">${arr.map(x => `<span class="badge b-gray mono">${x}</span>`).join('')}</div>`;
+    return `
+      <div class="solid">
+        <div class="card"><div class="letter">S</div><h4>Responsabilidad única</h4><p>Cada clase tiene una sola razón para cambiar.</p><ul>
+          <li><code>ClientValidator</code> solo valida; <code>ClientService</code> solo gestiona clientes.</li>
+          <li><code>BillingService</code> genera, <code>PaymentService</code> cobra, <code>ReportService</code> mide.</li>
+          <li><code>SlaPolicy</code> separa la política de tiempos del flujo de tickets.</li>
+          <li>Las vistas solo pintan y delegan en servicios.</li></ul></div>
+        <div class="card"><div class="letter">O</div><h4>Abierto / Cerrado</h4><p>Se extiende el comportamiento sin modificar código existente.</p><ul>
+          <li>Reglas de facturación <code>IBillingRule</code>: cargo del plan, instalación, fidelidad, ISV.</li>
+          <li>Medios de pago: se agrega una pasarela nueva sin tocar <code>PaymentService</code>.</li>
+          <li>Tipos de plan con <code>PlanFactory.register()</code>.</li>
+          <li>Rutas del menú declaradas en una lista.</li></ul></div>
+        <div class="card"><div class="letter">L</div><h4>Sustitución de Liskov</h4><p>Los subtipos se usan donde se espera el tipo base sin sorpresas.</p><ul>
+          <li><code>FiberPlan</code>, <code>WirelessPlan</code>, <code>DslPlan</code> sustituyen a <code>Plan</code>: las vistas y la facturación no preguntan el tipo.</li>
+          <li><code>LocalStorageRepository</code> sustituye a <code>InMemoryRepository</code> y solo añade persistencia.</li></ul></div>
+        <div class="card"><div class="letter">I</div><h4>Segregación de interfaces</h4><p>Interfaces pequeñas: nadie depende de métodos que no usa.</p><ul>
+          <li><code>IReadable</code> y <code>IWritable</code> están separados.</li>
+          <li><code>ReportService</code> y <code>SequentialIdGenerator</code> solo reciben lectores.</li>
+          <li><code>INotifier</code> solo exige <code>channel</code> y <code>send()</code>.</li></ul></div>
+        <div class="card"><div class="letter">D</div><h4>Inversión de dependencias</h4><p>Los servicios dependen de abstracciones inyectadas, no de clases concretas.</p><ul>
+          <li>Todo se ensambla en <code>bootstrap()</code> (raíz de composición).</li>
+          <li>Cambiar localStorage por una API REST = cambiar solo la fábrica de repositorios.</li>
+          <li><code>NotificationService</code> no sabe si envía Email, SMS o WhatsApp.</li></ul></div>
+      </div>
+      <div class="grid2">
+        <section class="card"><h3>Capas de la aplicación</h3><div class="layers">
+          <div class="layer"><b>Presentación</b>${chips(['Router', 'DashboardView', 'ClientsView', 'PlansView', 'BillingView', 'SupportView', 'Modal', 'Toast'])}</div>
+          <div class="layer"><b>Servicios</b>${chips(['ClientService', 'PlanService', 'BillingService', 'PaymentService', 'TicketService', 'ReportService', 'NotificationService'])}</div>
+          <div class="layer"><b>Reglas / Políticas</b>${chips(['PlanChargeRule', 'InstallationFeeRule', 'LoyaltyDiscountRule', 'TaxRule', 'SlaPolicy', 'ClientValidator'])}</div>
+          <div class="layer"><b>Dominio</b>${chips(['Plan', 'FiberPlan', 'WirelessPlan', 'DslPlan', 'PlanFactory'])}</div>
+          <div class="layer"><b>Infraestructura</b>${chips(['LocalStorageRepository', 'EventBus', 'EmailNotifier', 'SmsNotifier', 'CashGateway', 'CardGateway', 'TransferGateway'])}</div>
+        </div></section>
+        <section class="card"><h3>Ejemplo OCP: agregar una promoción</h3>
+<pre>// 1. Nueva regla, sin tocar BillingService
+class PromoFibraRule {
+  applies(ctx) { return ctx.plan.type === 'fibra'; }
+  apply(ctx) {
+    ctx.items.push({ concept: 'Promo fibra', amount: -50 });
+  }
+}
+
+// 2. Registrarla en bootstrap() (antes del ISV)
+rules: [
+  new PlanChargeRule(),
+  new InstallationFeeRule(invoicesRepo),
+  new LoyaltyDiscountRule(12, 0.10),
+  new PromoFibraRule(),          // ← nueva
+  new TaxRule(0.15),
+]</pre></section>
+      </div>
+      <section class="card"><h3>Verificación de contratos en tiempo de ejecución</h3>
+        <table><thead><tr><th>Componente</th><th>Contratos</th><th>Resultado</th></tr></thead><tbody>${checks}</tbody></table></section>`;
+  }
+}
+
+class Router {
+  constructor({ nav, outlet, title, routes }) { routes.forEach(r => assertImplements(r.view, IView)); Object.assign(this, { nav, outlet, title, routes }); }
+  start() {
+    this.nav.innerHTML = this.routes.map(r => `<a href="#${r.id}" data-route="${r.id}"><span class="ico">${r.icon}</span>${esc(r.label)}</a>`).join('');
+    window.addEventListener('hashchange', () => this.show());
+    this.show();
+  }
+  show() {
+    const id = location.hash.slice(1);
+    const r = this.routes.find(x => x.id === id) || this.routes[0];
+    this.nav.querySelectorAll('a').forEach(a => a.classList.toggle('active', a.dataset.route === r.id));
+    this.title.textContent = r.label;
+    r.view.render(this.outlet);
+  }
+}
+
+/* =====================================================================
+ * Datos de demostración
+ * ===================================================================== */
+const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return isoDay(d); };
+const hoursAgo = h => new Date(Date.now() - h * 3600e3).toISOString();
+const SEED = {
+  plans: [
+    { id: 'P-0001', type: 'fibra',       name: 'Fibra Hogar 300',  down: 300,  up: 300,  price: 899 },
+    { id: 'P-0002', type: 'fibra',       name: 'Fibra Pro 600',    down: 600,  up: 600,  price: 1199 },
+    { id: 'P-0003', type: 'fibra',       name: 'Fibra Giga 1000',  down: 1000, up: 1000, price: 1599 },
+    { id: 'P-0004', type: 'inalambrico', name: 'Rural Aire 50',    down: 50,   up: 10,   price: 699 },
+    { id: 'P-0005', type: 'dsl',         name: 'DSL Básico 20',    down: 20,   up: 2,    price: 499 },
+  ],
+  clients: [
+    { id: 'C-0001', name: 'María Fernanda López', document: '1032456789', email: 'mafe.lopez@correo.com',   phone: '3104567890', address: 'Cra 15 #45-20, Apto 302', planId: 'P-0002', since: daysAgo(720), status: 'activo' },
+    { id: 'C-0002', name: 'Carlos Andrés Ruiz',   document: '79845123',   email: 'carlos.ruiz@correo.com',  phone: '3157894561', address: 'Cl 80 #20-11',            planId: 'P-0001', since: daysAgo(400), status: 'activo' },
+    { id: 'C-0003', name: 'Panadería La Espiga',  document: '900123456',  email: 'contacto@laespiga.co',    phone: '6017451230', address: 'Av 68 #13-40, Local 2',   planId: 'P-0003', since: daysAgo(150), status: 'activo' },
+    { id: 'C-0004', name: 'Luisa Gómez',          document: '1020304050', email: 'luisa.gomez@correo.com',  phone: '3001234567', address: 'Vereda El Rosal, Finca 3', planId: 'P-0004', since: daysAgo(90),  status: 'activo' },
+    { id: 'C-0005', name: 'Jorge Martínez',       document: '80123987',   email: 'jorge.m@correo.com',      phone: '3204561237', address: 'Cl 13 #7-25',             planId: 'P-0005', since: daysAgo(1100), status: 'activo' },
+    { id: 'C-0006', name: 'Ana Sofía Herrera',    document: '1015987456', email: 'ana.herrera@correo.com',  phone: '3112223344', address: 'Cra 50 #100-15, Casa 8',  planId: 'P-0001', since: daysAgo(60),  status: 'activo' },
+    { id: 'C-0007', name: 'Pedro Castillo',       document: '19456123',   email: 'pcastillo@correo.com',    phone: '3176549870', address: 'Cl 45 Sur #30-02',        planId: 'P-0005', since: daysAgo(500), status: 'suspendido' },
+    { id: 'C-0008', name: 'Coworking Nodo',       document: '901456789',  email: 'admin@nodocowork.co',     phone: '6014567788', address: 'Cra 7 #71-21, Piso 4',    planId: 'P-0003', since: daysAgo(380), status: 'activo' },
+  ],
+  tickets: [
+    { id: 'T-0001', clientId: 'C-0004', subject: 'Intermitencia en la señal cuando llueve', category: 'Sin conexión', priority: 'alta',  status: 'abierto',     createdAt: hoursAgo(6),  dueAt: hoursAgo(2) },
+    { id: 'T-0002', clientId: 'C-0002', subject: 'Velocidad menor a la contratada en horas pico', category: 'Lentitud', priority: 'media', status: 'en_progreso', createdAt: hoursAgo(10), dueAt: hoursAgo(-14) },
+    { id: 'T-0003', clientId: 'C-0003', subject: 'Solicita factura electrónica a nombre de la empresa', category: 'Facturación', priority: 'baja', status: 'abierto', createdAt: hoursAgo(20), dueAt: hoursAgo(-52) },
+    { id: 'T-0004', clientId: 'C-0001', subject: 'Cambio de router por daño', category: 'Instalación', priority: 'media', status: 'resuelto', createdAt: hoursAgo(70), dueAt: hoursAgo(46) },
+  ],
+};
+
+/* =====================================================================
+ * 7. RAÍZ DE COMPOSICIÓN — Dependency Inversion Principle
+ *    El único lugar que conoce clases concretas. Para cambiar de
+ *    almacenamiento, notificador o pasarela, se cambia SOLO aquí.
+ * ===================================================================== */
+function bootstrap() {
+  const STORAGE_PREFIX = 'conectanet-hn:';
+  const repository = (key, seed, hydrate) => new LocalStorageRepository(STORAGE_PREFIX + key, seed, hydrate);
+  // const repository = (key, seed, hydrate) => new InMemoryRepository(seed, hydrate);   // ← alternativa sin persistencia
+
+  const bus = new EventBus();
+  const planFactory = new PlanFactory()
+    .register('fibra', FiberPlan, 'Fibra óptica')
+    .register('inalambrico', WirelessPlan, 'Inalámbrico')
+    .register('dsl', DslPlan, 'DSL');
+
+  const plansRepo    = repository('plans', SEED.plans, d => planFactory.create(d));
+  const clientsRepo  = repository('clients', SEED.clients);
+  const invoicesRepo = repository('invoices', []);
+  const ticketsRepo  = repository('tickets', SEED.tickets);
+
+  const sla = new SlaPolicy({ alta: 4, media: 24, baja: 72 });
+  const outbox = new Outbox();
+  const activity = new ActivityLog(bus);
+
+  const clients  = new ClientService({ reader: clientsRepo, writer: clientsRepo, validator: new ClientValidator(plansRepo), ids: new SequentialIdGenerator(clientsRepo, 'C'), bus });
+  const plans    = new PlanService({ reader: plansRepo, writer: plansRepo, factory: planFactory, ids: new SequentialIdGenerator(plansRepo, 'P'), clients: clientsRepo, bus });
+  const billingRules = [new PlanChargeRule(), new InstallationFeeRule(invoicesRepo), new LoyaltyDiscountRule(12, 0.10), new TaxRule(0.15)];
+  const billing  = new BillingService({ invoices: invoicesRepo, clients: clientsRepo, plans: plansRepo, rules: billingRules, ids: new SequentialIdGenerator(invoicesRepo, 'F', 6), bus });
+  const gateways = [new CashGateway(), new CardGateway(), new TransferGateway()];
+  const payments = new PaymentService({ invoices: invoicesRepo, clients: clientsRepo, gateways, bus });
+  const tickets  = new TicketService({ reader: ticketsRepo, writer: ticketsRepo, ids: new SequentialIdGenerator(ticketsRepo, 'T'), sla, clients: clientsRepo, bus });
+  const reports  = new ReportService({ clients: clientsRepo, plans: plansRepo, invoices: invoicesRepo, tickets: ticketsRepo, sla, billing });
+
+  // Datos históricos de demo: facturación del mes anterior, la mayoría pagada.
+  if (invoicesRepo.getAll().length === 0) {
+    const prev = billing.generateAll(Period.previous(Period.current()));
+    prev.forEach((inv, i) => { if (i % 3 !== 2) payments.pay(inv.id, gateways[i % gateways.length].id); });
+    activity.items = [];
+  }
+
+  // Las notificaciones se activan después de cargar la demo.
+  const notifiers = [new EmailNotifier(outbox), new SmsNotifier(outbox)];
+  new NotificationService({ notifiers, bus });
+
+  const toast = new Toast(document.getElementById('toasts'));
+  const modal = new Modal(document.getElementById('modal-host'));
+  const ui = { toast, modal };
+
+  const contractChecks = [
+    { name: 'LocalStorageRepository', obj: clientsRepo, contracts: [IReadable, IWritable] },
+    { name: 'SequentialIdGenerator', obj: new SequentialIdGenerator(clientsRepo, 'X'), contracts: [IIdGenerator] },
+    { name: 'EventBus', obj: bus, contracts: [IEventBus] },
+    ...notifiers.map(n => ({ name: n.constructor.name, obj: n, contracts: [INotifier] })),
+    ...gateways.map(g => ({ name: g.constructor.name, obj: g, contracts: [IPaymentGateway] })),
+    ...billingRules.map(r => ({ name: r.constructor.name, obj: r, contracts: [IBillingRule] })),
+  ];
+
+  const router = new Router({
+    nav: document.getElementById('nav'), outlet: document.getElementById('outlet'), title: document.getElementById('title'),
+    routes: [
+      { id: 'dashboard', icon: '▦', label: 'Dashboard',          view: new DashboardView({ reports, activity, outbox, ...ui }) },
+      { id: 'clientes',  icon: '👥', label: 'Clientes',           view: new ClientsView({ clients, plans, ...ui }) },
+      { id: 'planes',    icon: '📶', label: 'Planes',             view: new PlansView({ plans, ...ui }) },
+      { id: 'facturas',  icon: '🧾', label: 'Facturación',        view: new BillingView({ billing, payments, clients, ...ui }) },
+      { id: 'soporte',   icon: '🛠', label: 'Soporte',            view: new SupportView({ tickets, clients, ...ui }) },
+      { id: 'solid',     icon: '◆', label: 'Arquitectura SOLID', view: new SolidView({ contractChecks, ...ui }) },
+    ],
+  });
+  contractChecks.push(...router.routes.map(r => ({ name: r.view.constructor.name, obj: r.view, contracts: [IView] })));
+
+  document.getElementById('period-label').textContent = `Período actual: ${Fmt.period(Period.current())}`;
+  document.getElementById('reset').onclick = () => {
+    if (!confirm('¿Restablecer todos los datos de demostración?')) return;
+    Object.keys(localStorage).filter(k => k.startsWith(STORAGE_PREFIX)).forEach(k => localStorage.removeItem(k));
+    location.reload();
+  };
+  router.start();
+}
+
+bootstrap();
+</script>
+</body>
+</html>
