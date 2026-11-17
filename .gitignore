@@ -37,3 +37,6 @@ coverage
 Thumbs.db 
 # Respaldos comprimidos (pueden contener .env)
 *.zip
+
+# Logos subidos desde Configuración
+public/img/uploads/

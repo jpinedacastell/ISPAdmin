@@ -1,34 +1,210 @@
 <%- include('../partials/header') %>
 
+<%
+    const pestanas = [
+        { id: 'general', icono: 'fa-sliders-h', texto: 'General' },
+        { id: 'empresa', icono: 'fa-building', texto: 'Empresa' },
+        { id: 'facturacion', icono: 'fa-file-invoice-dollar', texto: 'Facturación' },
+        { id: 'seguridad', icono: 'fa-lock', texto: 'Seguridad' }
+    ];
+%>
+
 <div class="container-fluid px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Configuración</h1>
         <a href="/dashboard" class="btn btn-outline-secondary">Volver</a>
     </div>
 
-    <div class="card shadow mb-4">
-        <div class="card-header">
-            <h6 class="m-0 font-weight-bold text-primary">Cambiar Contraseña</h6>
+    <% (success_msg || []).forEach(function(mensaje) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <%= mensaje %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
-        <div class="card-body">
-            <form method="POST" action="/configuracion/password">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <div class="mb-3">
-                    <label for="passwordActual" class="form-label">Contraseña actual</label>
-                    <input type="password" class="form-control" id="passwordActual" name="passwordActual" required>
+    <% }); %>
+    <% (error_msg || []).forEach(function(mensaje) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <%= mensaje %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <% }); %>
+
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <% pestanas.forEach(function(p) { %>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link <%= pestana === p.id ? 'active' : '' %>" data-bs-toggle="tab"
+                        data-bs-target="#tab-<%= p.id %>" type="button" role="tab">
+                    <i class="fas <%= p.icono %> me-1"></i> <%= p.texto %>
+                </button>
+            </li>
+        <% }); %>
+    </ul>
+
+    <div class="tab-content">
+        <!-- General -->
+        <div class="tab-pane fade <%= pestana === 'general' ? 'show active' : '' %>" id="tab-general" role="tabpanel">
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header">
+                            <h6 class="m-0 font-weight-bold text-primary">Nombre del sistema</h6>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="/configuracion/general">
+                                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                <div class="mb-3">
+                                    <label for="nombre_sistema" class="form-label">Nombre</label>
+                                    <input type="text" class="form-control" id="nombre_sistema" name="nombre_sistema"
+                                           value="<%= sistema.nombreSistema %>" maxlength="<%= limites.NOMBRE_SISTEMA_MAX %>" required>
+                                    <div class="form-text">Se muestra en el menú, en la barra superior y en el título de las pestañas.</div>
+                                </div>
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label for="passwordNuevo" class="form-label">Nueva contraseña</label>
-                    <input type="password" class="form-control" id="passwordNuevo" name="passwordNuevo" minlength="6" required>
+
+                <div class="col-lg-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header">
+                            <h6 class="m-0 font-weight-bold text-primary">Logo</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center mb-3 p-3 bg-light rounded">
+                                <img id="logoPreview" src="<%= sistema.logoUrl %>" alt="Logo actual" style="max-height: 90px; max-width: 100%;">
+                            </div>
+                            <form method="POST" action="/configuracion/logo?_csrf=<%= encodeURIComponent(csrfToken) %>" enctype="multipart/form-data">
+                                <div class="mb-3">
+                                    <label for="logo" class="form-label">Nuevo logo</label>
+                                    <input type="file" class="form-control" id="logo" name="logo" accept="image/png,image/jpeg,image/webp" required>
+                                    <div class="form-text">Formatos: <%= formatosLogo %>. Máximo <%= logoTamanoMaxMb %> MB. Se usa en el menú, el login y las facturas.</div>
+                                </div>
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Subir logo</button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label for="passwordConfirmacion" class="form-label">Confirmar nueva contraseña</label>
-                    <input type="password" class="form-control" id="passwordConfirmacion" name="passwordConfirmacion" minlength="6" required>
+            </div>
+        </div>
+
+        <!-- Empresa -->
+        <div class="tab-pane fade <%= pestana === 'empresa' ? 'show active' : '' %>" id="tab-empresa" role="tabpanel">
+            <div class="card shadow mb-4">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Datos de la empresa</h6>
                 </div>
-                <button type="submit" class="btn btn-primary">Guardar cambios</button>
-            </form>
+                <div class="card-body">
+                    <p class="text-muted small">Estos datos aparecen en el encabezado de las facturas.</p>
+                    <form method="POST" action="/configuracion/empresa">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="empresa_nombre" class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="empresa_nombre" name="empresa_nombre"
+                                       value="<%= sistema.empresa.nombre %>" maxlength="<%= limites.EMPRESA_NOMBRE_MAX %>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="empresa_rtn" class="form-label">RTN <small class="text-muted">(opcional)</small></label>
+                                <input type="text" class="form-control" id="empresa_rtn" name="empresa_rtn"
+                                       value="<%= sistema.empresa.rtn %>" maxlength="<%= limites.RTN_MAX %>">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="empresa_telefono" class="form-label">Teléfono</label>
+                                <input type="text" class="form-control" id="empresa_telefono" name="empresa_telefono"
+                                       value="<%= sistema.empresa.telefono %>" maxlength="<%= limites.TELEFONO_MAX %>">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="empresa_email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="empresa_email" name="empresa_email"
+                                       value="<%= sistema.empresa.email %>" maxlength="<%= limites.EMAIL_MAX %>">
+                            </div>
+                            <div class="col-12 mb-3">
+                                <label for="empresa_direccion" class="form-label">Dirección</label>
+                                <input type="text" class="form-control" id="empresa_direccion" name="empresa_direccion"
+                                       value="<%= sistema.empresa.direccion %>" maxlength="<%= limites.DIRECCION_MAX %>">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Facturación -->
+        <div class="tab-pane fade <%= pestana === 'facturacion' ? 'show active' : '' %>" id="tab-facturacion" role="tabpanel">
+            <div class="card shadow mb-4">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Parámetros de facturación</h6>
+                </div>
+                <div class="card-body">
+                    <% if (!facturacion) { %>
+                        <div class="alert alert-warning mb-0">No existe la configuración de facturación en la base de datos.</div>
+                    <% } else { %>
+                        <form method="POST" action="/configuracion/facturacion">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="dia_generacion" class="form-label">Día de generación</label>
+                                    <input type="number" class="form-control" id="dia_generacion" name="dia_generacion"
+                                           value="<%= facturacion.dia_generacion %>"
+                                           min="<%= limites.DIA_GENERACION_MIN %>" max="<%= limites.DIA_GENERACION_MAX %>" required>
+                                    <div class="form-text">Día del mes en que se generan las facturas (<%= limites.DIA_GENERACION_MIN %>–<%= limites.DIA_GENERACION_MAX %>).</div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="dias_vencimiento" class="form-label">Días de vencimiento</label>
+                                    <input type="number" class="form-control" id="dias_vencimiento" name="dias_vencimiento"
+                                           value="<%= facturacion.dias_vencimiento %>"
+                                           min="<%= limites.DIAS_VENCIMIENTO_MIN %>" max="<%= limites.DIAS_VENCIMIENTO_MAX %>" required>
+                                    <div class="form-text">Días para pagar después de la emisión.</div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="prefijo_factura" class="form-label">Prefijo del recibo</label>
+                                    <input type="text" class="form-control" id="prefijo_factura" name="prefijo_factura"
+                                           value="<%= facturacion.prefijo_factura %>" maxlength="<%= limites.PREFIJO_MAX %>" required>
+                                    <div class="form-text">Último número emitido: <strong><%= facturacion.ultimo_numero %></strong></div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar</button>
+                        </form>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seguridad -->
+        <div class="tab-pane fade <%= pestana === 'seguridad' ? 'show active' : '' %>" id="tab-seguridad" role="tabpanel">
+            <div class="card shadow mb-4">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Cambiar Contraseña</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/configuracion/password">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <div class="mb-3">
+                            <label for="passwordActual" class="form-label">Contraseña actual</label>
+                            <input type="password" class="form-control" id="passwordActual" name="passwordActual" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="passwordNuevo" class="form-label">Nueva contraseña</label>
+                            <input type="password" class="form-control" id="passwordNuevo" name="passwordNuevo" minlength="6" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="passwordConfirmacion" class="form-label">Confirmar nueva contraseña</label>
+                            <input type="password" class="form-control" id="passwordConfirmacion" name="passwordConfirmacion" minlength="6" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+// Vista previa del logo antes de subirlo
+document.getElementById('logo').addEventListener('change', function (e) {
+    const archivo = e.target.files[0];
+    if (archivo) document.getElementById('logoPreview').src = URL.createObjectURL(archivo);
+});
+</script>
 
 <%- include('../partials/footer') %>

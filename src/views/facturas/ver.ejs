@@ -516,7 +516,7 @@ body {
     margin-top: 0.85rem !important;
 }
 
-.pdf-generating .premium-invoice img[alt="CONETXA Logo"] {
+.pdf-generating .premium-invoice img.logo-empresa {
     height: 54px !important;
 }
 
@@ -692,13 +692,13 @@ const saldoPendiente = Math.max(totalFactura - montoPagado - creditoAplicado, 0)
         <div class="card-body p-4">
             <!-- Header with Watermark -->
             <div class="position-relative">
-                <div class="watermark">CONETXA</div>
+                <div class="watermark"><%= sistema.empresa.nombre %></div>
                 
                 <!-- Company Header -->
 <div class="row align-items-center mb-4">
     <div class="col-md-6">
         <div class="d-flex align-items-center">
-            <img src="/img/Logo.png" alt="CONETXA Logo" class="me-3" style="height: 60px;">
+            <img src="<%= sistema.logoUrl %>" alt="Logo <%= sistema.empresa.nombre %>" class="logo-empresa me-3" style="height: 60px;">
             <div>
             </div>
         </div>
@@ -720,10 +720,11 @@ const saldoPendiente = Math.max(totalFactura - montoPagado - creditoAplicado, 0)
                     <div class="info-card">
                         <h5 class="info-card-title"><i class="fas fa-building me-2"></i>Empresa</h5>
                         <div class="info-card-body">
-                            <p class="mb-1"><strong>CONETXA</strong></p>
-                            <p class="mb-1">Cofradia, Cortes, Honduras</p>
-                            <p class="mb-1"><i class="fas fa-phone-alt me-2"></i>(504) 8780-3554</p>
-                            <p class="mb-1"><i class="fas fa-envelope me-2"></i>info@conetxahn.com</p>
+                            <p class="mb-1"><strong><%= sistema.empresa.nombre %></strong></p>
+                            <% if (sistema.empresa.rtn) { %><p class="mb-1">RTN: <%= sistema.empresa.rtn %></p><% } %>
+                            <% if (sistema.empresa.direccion) { %><p class="mb-1"><%= sistema.empresa.direccion %></p><% } %>
+                            <% if (sistema.empresa.telefono) { %><p class="mb-1"><i class="fas fa-phone-alt me-2"></i><%= sistema.empresa.telefono %></p><% } %>
+                            <% if (sistema.empresa.email) { %><p class="mb-1"><i class="fas fa-envelope me-2"></i><%= sistema.empresa.email %></p><% } %>
                         </div>
                     </div>
                 </div>
@@ -1067,8 +1068,8 @@ function getPdfConstructor() {
 }
 
 const reciboPdfFilename = <%- JSON.stringify(mesFacturado.toLocaleString('es-ES', opciones) + ' - ' + factura.cliente_nombre + ' ' + factura.cliente_apellido + ' - ' + factura.numero_factura + '.pdf') %>;
-const reciboShareTitle = <%- JSON.stringify('Recibo CONETXA ' + factura.numero_factura) %>;
-const reciboShareText = <%- JSON.stringify('Hola ' + (factura.cliente_nombre || '') + ', le comparto su recibo de CONETXA ' + factura.numero_factura + '.') %>;
+const reciboShareTitle = <%- JSON.stringify('Recibo ' + sistema.empresa.nombre + ' ' + factura.numero_factura) %>;
+const reciboShareText = <%- JSON.stringify('Hola ' + (factura.cliente_nombre || '') + ', le comparto su recibo de ' + sistema.empresa.nombre + ' ' + factura.numero_factura + '.') %>;
 const clienteWhatsAppTelefono = <%- JSON.stringify(factura.cliente_telefono || '') %>;
 const saldoFacturaActual = <%= JSON.stringify(Number(saldoPendiente.toFixed(2))) %>;
 

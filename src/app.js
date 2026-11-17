@@ -35,6 +35,7 @@ const contabilidadRoutes = require('./routes/contabilidadRoutes');
 const userRoutes = require('./routes/userRoutes');
 
 const { verifyToken } = require('./middleware/auth');
+const { cargarConfiguracionSistema } = require('./middleware/configuracionSistema');
 
 // Crear aplicación Express
 const app = express();
@@ -108,6 +109,9 @@ app.use((req, res, next) => {
     res.locals.title = 'ISP Admin';
     next();
 });
+
+// Nombre, logo y datos de la empresa para todas las vistas
+app.use(cargarConfiguracionSistema);
 
 // Rutas
 app.use('/auth', authRoutes);
