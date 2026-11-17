@@ -1,0 +1,299 @@
+<%- include('../partials/header') %>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Resumen Anual de Facturación</h1>
+        <a href="/facturacion" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Volver a Facturación
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <label for="anioResumen" class="form-label mb-0">Año</label>
+                    <input type="number" id="anioResumen" class="form-control" min="2000" max="2100" style="width: 120px;">
+                    <label for="estadoClienteResumen" class="form-label mb-0 ms-2">Cliente</label>
+                    <select id="estadoClienteResumen" class="form-select" style="width: 150px;">
+                        <option value="todos">Todos</option>
+                        <option value="activos" selected>Activos</option>
+                        <option value="desactivados">Desactivados</option>
+                    </select>
+                    <div class="form-check form-switch ms-2">
+                        <input class="form-check-input" type="checkbox" id="soloConDeudaResumen">
+                        <label class="form-check-label" for="soloConDeudaResumen">Solo con deuda</label>
+                    </div>
+                    <button id="cargarResumenAnual" class="btn btn-primary btn-sm">Cargar</button>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button id="exportExcel" class="btn btn-success btn-sm">
+                        <i class="fas fa-file-excel"></i> Excel
+                    </button>
+                    <button id="exportPdf" class="btn btn-danger btn-sm">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </button>
+                    <button id="printTable" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-print"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table id="resumenAnualTable" class="table table-bordered table-sm align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Cliente</th>
+                            <th>Total por Pagar</th>
+                            <th>Ene</th>
+                            <th>Feb</th>
+                            <th>Mar</th>
+                            <th>Abr</th>
+                            <th>May</th>
+                            <th>Jun</th>
+                            <th>Jul</th>
+                            <th>Ago</th>
+                            <th>Sep</th>
+                            <th>Oct</th>
+                            <th>Nov</th>
+                            <th>Dic</th>
+                            <th>Accion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resumenAnualBody"></tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-between mt-2">
+                <div class="fw-bold">Total de registros: <span id="totalRegistrosResumen">0</span></div>
+                <div class="fw-bold">Gran Total por Pagar: <span id="granTotalPorPagar">L 0.00</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function estadoMesBadge(estado) {
+    if (estado === 'no_aplica') return '';
+    if (estado === 'futuro') return '<span class="badge bg-light text-muted border">Futuro</span>';
+    if (estado === 'pagada') return '<span class="badge bg-success">Pagado</span>';
+    if (estado === 'pendiente') return '<span class="badge bg-warning text-dark">Pendiente</span>';
+    return '<span class="badge bg-secondary">Sin factura</span>';
+}
+
+function estadoMesTexto(estado) {
+    if (estado === 'no_aplica') return '';
+    if (estado === 'futuro') return 'Futuro';
+    if (estado === 'pagada') return 'Pagado';
+    if (estado === 'pendiente') return 'Pendiente';
+    return 'Sin factura';
+}
+
+function esMesFuturo(mesNumero, anio) {
+    const hoy = new Date();
+    const anioActual = hoy.getUTCFullYear();
+    const mesActual = hoy.getUTCMonth() + 1;
+    return anio > anioActual || (anio === anioActual && mesNumero > mesActual);
+}
+
+function formatoMoneda(valor) {
+    return `L ${Number(valor || 0).toFixed(2)}`;
+}
+
+async function cargarResumenAnual() {
+    const anio = Number.parseInt($('#anioResumen').val(), 10) || new Date().getUTCFullYear();
+    const estadoCliente = $('#estadoClienteResumen').val() || 'activos';
+    const soloConDeuda = $('#soloConDeudaResumen').is(':checked') ? 1 : 0;
+    const body = $('#resumenAnualBody');
+    body.html('<tr><td colspan="16" class="text-center text-muted">Cargando...</td></tr>');
+
+    try {
+        const response = await fetch(`/facturacion/resumen-anual?anio=${anio}&estado_cliente=${encodeURIComponent(estadoCliente)}&solo_con_deuda=${soloConDeuda}`);
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'No se pudo cargar el resumen anual');
+        }
+
+        if (!result.data.length) {
+            body.html('<tr><td colspan="16" class="text-center text-muted">No hay clientes registrados</td></tr>');
+            $('#totalRegistrosResumen').text('0');
+            $('#granTotalPorPagar').text(formatoMoneda(0));
+            return;
+        }
+
+        const html = result.data.map((cliente, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${cliente.cliente_nombre} ${cliente.cliente_apellido}</td>
+                <td data-total-por-pagar="${Number(cliente.total_por_pagar || 0)}">${formatoMoneda(cliente.total_por_pagar)}</td>
+                <td data-estado="${esMesFuturo(1, anio) && cliente.meses[1] === 'sin_factura' ? 'futuro' : cliente.meses[1]}">${estadoMesBadge(esMesFuturo(1, anio) && cliente.meses[1] === 'sin_factura' ? 'futuro' : cliente.meses[1])}</td>
+                <td data-estado="${esMesFuturo(2, anio) && cliente.meses[2] === 'sin_factura' ? 'futuro' : cliente.meses[2]}">${estadoMesBadge(esMesFuturo(2, anio) && cliente.meses[2] === 'sin_factura' ? 'futuro' : cliente.meses[2])}</td>
+                <td data-estado="${esMesFuturo(3, anio) && cliente.meses[3] === 'sin_factura' ? 'futuro' : cliente.meses[3]}">${estadoMesBadge(esMesFuturo(3, anio) && cliente.meses[3] === 'sin_factura' ? 'futuro' : cliente.meses[3])}</td>
+                <td data-estado="${esMesFuturo(4, anio) && cliente.meses[4] === 'sin_factura' ? 'futuro' : cliente.meses[4]}">${estadoMesBadge(esMesFuturo(4, anio) && cliente.meses[4] === 'sin_factura' ? 'futuro' : cliente.meses[4])}</td>
+                <td data-estado="${esMesFuturo(5, anio) && cliente.meses[5] === 'sin_factura' ? 'futuro' : cliente.meses[5]}">${estadoMesBadge(esMesFuturo(5, anio) && cliente.meses[5] === 'sin_factura' ? 'futuro' : cliente.meses[5])}</td>
+                <td data-estado="${esMesFuturo(6, anio) && cliente.meses[6] === 'sin_factura' ? 'futuro' : cliente.meses[6]}">${estadoMesBadge(esMesFuturo(6, anio) && cliente.meses[6] === 'sin_factura' ? 'futuro' : cliente.meses[6])}</td>
+                <td data-estado="${esMesFuturo(7, anio) && cliente.meses[7] === 'sin_factura' ? 'futuro' : cliente.meses[7]}">${estadoMesBadge(esMesFuturo(7, anio) && cliente.meses[7] === 'sin_factura' ? 'futuro' : cliente.meses[7])}</td>
+                <td data-estado="${esMesFuturo(8, anio) && cliente.meses[8] === 'sin_factura' ? 'futuro' : cliente.meses[8]}">${estadoMesBadge(esMesFuturo(8, anio) && cliente.meses[8] === 'sin_factura' ? 'futuro' : cliente.meses[8])}</td>
+                <td data-estado="${esMesFuturo(9, anio) && cliente.meses[9] === 'sin_factura' ? 'futuro' : cliente.meses[9]}">${estadoMesBadge(esMesFuturo(9, anio) && cliente.meses[9] === 'sin_factura' ? 'futuro' : cliente.meses[9])}</td>
+                <td data-estado="${esMesFuturo(10, anio) && cliente.meses[10] === 'sin_factura' ? 'futuro' : cliente.meses[10]}">${estadoMesBadge(esMesFuturo(10, anio) && cliente.meses[10] === 'sin_factura' ? 'futuro' : cliente.meses[10])}</td>
+                <td data-estado="${esMesFuturo(11, anio) && cliente.meses[11] === 'sin_factura' ? 'futuro' : cliente.meses[11]}">${estadoMesBadge(esMesFuturo(11, anio) && cliente.meses[11] === 'sin_factura' ? 'futuro' : cliente.meses[11])}</td>
+                <td data-estado="${esMesFuturo(12, anio) && cliente.meses[12] === 'sin_factura' ? 'futuro' : cliente.meses[12]}">${estadoMesBadge(esMesFuturo(12, anio) && cliente.meses[12] === 'sin_factura' ? 'futuro' : cliente.meses[12])}</td>
+                <td>
+                    <a href="/clientes/${cliente.cliente_id}" class="btn btn-sm btn-outline-primary" title="Ver detalle de cliente y facturas">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                </td>
+            </tr>
+        `).join('');
+
+        body.html(html);
+        $('#totalRegistrosResumen').text(String(result.data.length));
+        $('#granTotalPorPagar').text(formatoMoneda(result.gran_total_por_pagar || 0));
+    } catch (error) {
+        console.error('Error al cargar resumen anual:', error);
+        body.html('<tr><td colspan="16" class="text-center text-danger">Error al cargar el resumen anual</td></tr>');
+        $('#totalRegistrosResumen').text('0');
+        $('#granTotalPorPagar').text(formatoMoneda(0));
+    }
+}
+
+function getTableTextData() {
+    const rows = [];
+    $('#resumenAnualTable tbody tr').each(function() {
+        const row = [];
+        $(this).find('td').each(function(index) {
+            if (index === 0) {
+                row.push($(this).text().trim());
+            } else if (index === 1) {
+                row.push($(this).text().trim());
+            } else if (index === 2) {
+                row.push(formatoMoneda($(this).data('total-por-pagar')));
+            } else if (index >= 3 && index <= 14) {
+                const estado = $(this).data('estado');
+                row.push(estadoMesTexto(estado));
+            }
+        });
+        if (row.length) rows.push(row);
+    });
+    return rows;
+}
+
+function exportarExcel() {
+    const headers = [['#', 'Cliente', 'Total por Pagar', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']];
+    const rows = getTableTextData();
+    rows.push(['', '', '', '', '', '', '', '', '', '', '', '', '', 'Gran Total', $('#granTotalPorPagar').text()]);
+    const ws = XLSX.utils.aoa_to_sheet([...headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
+    const anio = $('#anioResumen').val();
+    XLSX.writeFile(wb, `resumen_facturacion_${anio}.xlsx`);
+}
+
+function exportarPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    const anio = $('#anioResumen').val();
+    const estadoCliente = $('#estadoClienteResumen').val() || 'activos';
+    const headers = [['#', 'Cliente', 'Total por Pagar', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']];
+    const rows = getTableTextData();
+    rows.push(['', '', '', '', '', '', '', '', '', '', '', '', '', 'Gran Total', $('#granTotalPorPagar').text()]);
+
+    const estadoTexto = estadoCliente === 'activos'
+        ? 'Activos'
+        : (estadoCliente === 'desactivados' ? 'Desactivados' : 'Todos');
+
+    doc.setFontSize(14);
+    doc.setTextColor(33, 37, 41);
+    doc.text(`Resumen Anual de Facturación - ${anio}`, 14, 12);
+    doc.setFontSize(10);
+    doc.setTextColor(108, 117, 125);
+    doc.text(`Filtro de clientes: ${estadoTexto}`, 14, 18);
+    doc.text(`Registros: ${$('#totalRegistrosResumen').text()}`, 90, 18);
+    doc.text(`Generado: ${new Date().toLocaleString('es-ES')}`, 200, 18, { align: 'right' });
+
+    doc.autoTable({
+        head: headers,
+        body: rows,
+        startY: 22,
+        theme: 'grid',
+        styles: {
+            fontSize: 7,
+            cellPadding: 1.8,
+            valign: 'middle',
+            halign: 'center',
+            lineColor: [222, 226, 230],
+            lineWidth: 0.1
+        },
+        headStyles: {
+            fillColor: [52, 58, 64],
+            textColor: 255,
+            fontStyle: 'bold'
+        },
+        bodyStyles: {
+            textColor: [33, 37, 41]
+        },
+        columnStyles: {
+            0: { cellWidth: 8 },
+            1: { cellWidth: 50, halign: 'left' },
+            2: { cellWidth: 24, halign: 'right' }
+        },
+        didParseCell: function(data) {
+            const row = data.row;
+            const col = data.column;
+
+            if (row.index === rows.length - 1) {
+                data.cell.styles.fillColor = [248, 249, 250];
+                data.cell.styles.fontStyle = 'bold';
+            }
+
+            if (row.section === 'body' && col.index >= 3 && col.index <= 14) {
+                const value = String(data.cell.raw || '').toLowerCase();
+                if (value === 'pagado') {
+                    data.cell.styles.textColor = [25, 135, 84];
+                    data.cell.styles.fillColor = [223, 240, 216];
+                    data.cell.styles.fontStyle = 'bold';
+                }
+                if (value === 'pendiente') {
+                    data.cell.styles.textColor = [102, 77, 3];
+                    data.cell.styles.fillColor = [255, 243, 205];
+                    data.cell.styles.lineColor = [255, 193, 7];
+                    data.cell.styles.lineWidth = 0.3;
+                    data.cell.styles.fontStyle = 'bold';
+                }
+                if (value === 'vencida') {
+                    data.cell.styles.textColor = [132, 32, 41];
+                    data.cell.styles.fillColor = [248, 215, 218];
+                    data.cell.styles.fontStyle = 'bold';
+                }
+                if (value === 'futuro') {
+                    data.cell.styles.textColor = [108, 117, 125];
+                    data.cell.styles.fillColor = [248, 249, 250];
+                }
+            }
+        }
+    });
+    doc.save(`resumen_facturacion_${anio}.pdf`);
+}
+
+function imprimirTabla() {
+    window.print();
+}
+
+$(document).ready(function() {
+    $('#anioResumen').val(new Date().getUTCFullYear());
+    $('#cargarResumenAnual').on('click', cargarResumenAnual);
+    $('#estadoClienteResumen').on('change', cargarResumenAnual);
+    $('#soloConDeudaResumen').on('change', cargarResumenAnual);
+    $('#exportExcel').on('click', exportarExcel);
+    $('#exportPdf').on('click', exportarPDF);
+    $('#printTable').on('click', imprimirTabla);
+    cargarResumenAnual();
+});
+</script>
+
+<%- include('../partials/footer') %>

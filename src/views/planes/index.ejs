@@ -1,0 +1,427 @@
+<%- include('../partials/header') %>
+
+<style>
+/* Estilos para el efecto de desenfoque en el modal */
+.modal-open .main-content {
+    filter: blur(3px);
+}
+
+.modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.3) !important;
+}
+
+#editarPlanModal, #nuevoPlanModal {
+    filter: none !important;
+}
+
+#editarPlanModal .modal-content, #nuevoPlanModal .modal-content {
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+    border: none;
+    filter: none !important;
+}
+</style>
+
+<div class="main-content">
+    <div class="container-fluid px-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Gestión de Planes</h1>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#nuevoPlanModal">
+                <i class="fas fa-plus"></i> Nuevo Plan
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <!-- Filtros -->
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <label for="filtroEstado" class="form-label">Estado</label>
+                        <select id="filtroEstado" class="form-select">
+                            <option value="">Todos</option>
+                            <option value="activo">Activos</option>
+                            <option value="inactivo">Inactivos</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="filtroPrecio" class="form-label">Precio Máximo</label>
+                        <input type="number" id="filtroPrecio" class="form-control" min="0" step="0.01">
+                    </div>
+                    <div class="col-md-3 mb-3 d-flex align-items-end">
+                        <button id="limpiarFiltros" class="btn btn-secondary">
+                            <i class="fas fa-filter-circle-xmark"></i> Limpiar Filtros
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="planesTable" class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Velocidad de Descarga</th>
+                                <th>Velocidad de Subida</th>
+                                <th>Precio</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Los datos se cargarán dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Nuevo Plan -->
+<div class="modal fade" id="nuevoPlanModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Plan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="nuevoPlanForm">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre del Plan</label>
+                        <input type="text" class="form-control" id="nombre" required>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="velocidad_descarga" class="form-label">Velocidad de Descarga (Mbps)</label>
+                            <input type="number" class="form-control" id="velocidad_descarga" required min="1">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="velocidad_subida" class="form-label">Velocidad de Subida (Mbps)</label>
+                            <input type="number" class="form-control" id="velocidad_subida" required min="1">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="precio" class="form-label">Precio (L)</label>
+                        <input type="number" class="form-control" id="precio" required min="0" step="0.01">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="guardarPlan">
+                    <i class="fas fa-save"></i> Guardar Plan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Edición -->
+<div class="modal fade" id="editarPlanModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Plan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editarPlanForm">
+                    <input type="hidden" id="planId">
+                    <div class="mb-3">
+                        <label for="editNombre" class="form-label">Nombre del Plan</label>
+                        <input type="text" class="form-control" id="editNombre" required>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="editVelocidadDescarga" class="form-label">Velocidad de Descarga (Mbps)</label>
+                            <input type="number" class="form-control" id="editVelocidadDescarga" required min="1">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editVelocidadSubida" class="form-label">Velocidad de Subida (Mbps)</label>
+                            <input type="number" class="form-control" id="editVelocidadSubida" required min="1">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editPrecio" class="form-label">Precio (L)</label>
+                        <input type="number" class="form-control" id="editPrecio" required min="0" step="0.01">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="guardarCambios">
+                    <i class="fas fa-save"></i> Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Obtener el token CSRF del meta tag
+const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+$(document).ready(function() {
+    // Inicializar DataTable
+    const table = $('#planesTable').DataTable({
+        ajax: {
+            url: '/planes/list',
+            dataSrc: ''
+        },
+        columns: [
+            { data: 'nombre' },
+            { 
+                data: 'velocidad_descarga',
+                render: function(data) {
+                    return data + ' Mbps';
+                }
+            },
+            { 
+                data: 'velocidad_subida',
+                render: function(data) {
+                    return data + ' Mbps';
+                }
+            },
+            { 
+                data: 'precio',
+                render: function(data) {
+                    return 'L ' + parseFloat(data).toFixed(2);
+                }
+            },
+            {
+                data: 'activo',
+                render: function(data) {
+                    return data ? 
+                        '<span class="badge bg-success">Activo</span>' : 
+                        '<span class="badge bg-danger">Inactivo</span>';
+                }
+            },
+            {
+                data: null,
+                orderable: false,
+                render: function(data) {
+                    return `
+                        <button class="btn btn-sm btn-${data.activo ? 'danger' : 'success'} toggle-plan me-1" 
+                                data-plan-id="${data.id}" title="${data.activo ? 'Desactivar' : 'Activar'}">
+                            <i class="fas fa-${data.activo ? 'ban' : 'check'}"></i>
+                        </button>
+                        <button class="btn btn-sm btn-primary editar-plan" 
+                                data-plan-id="${data.id}" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    `;
+                }
+            }
+        ],
+        order: [[0, 'asc']],
+        language: {
+            url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
+        },
+        responsive: true
+    });
+
+    // Función para aplicar filtros
+    function aplicarFiltros() {
+        const estado = $('#filtroEstado').val();
+        const precioMaximo = $('#filtroPrecio').val();
+
+        // Limpiar filtros anteriores
+        $.fn.dataTable.ext.search = [];
+
+        if (estado || precioMaximo) {
+            $.fn.dataTable.ext.search.push((settings, data, dataIndex) => {
+                const row = table.row(dataIndex).data();
+                let cumpleFiltros = true;
+
+                // Filtro por estado
+                if (estado) {
+                    const estaActivo = row.activo;
+                    if (estado === 'activo' && !estaActivo) {
+                        cumpleFiltros = false;
+                    }
+                    if (estado === 'inactivo' && estaActivo) {
+                        cumpleFiltros = false;
+                    }
+                }
+
+                // Filtro por precio máximo
+                if (precioMaximo && cumpleFiltros) {
+                    const precio = parseFloat(row.precio);
+                    if (precio > parseFloat(precioMaximo)) {
+                        cumpleFiltros = false;
+                    }
+                }
+
+                return cumpleFiltros;
+            });
+        }
+
+        table.draw();
+    }
+
+    // Eventos de filtros
+    $('#filtroEstado, #filtroPrecio').on('change', function() {
+        aplicarFiltros();
+    });
+
+    // Limpiar filtros
+    $('#limpiarFiltros').on('click', function() {
+        $('#filtroEstado').val('');
+        $('#filtroPrecio').val('');
+        aplicarFiltros();
+    });
+
+    // Manejar clic en botón de toggle (activar/desactivar)
+    $('#planesTable').on('click', '.toggle-plan', async function() {
+        const planId = $(this).data('plan-id');
+        
+        try {
+            const response = await fetch(`/planes/${planId}/toggle`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': csrfToken
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Error al cambiar el estado del plan');
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Recargar la tabla
+                table.ajax.reload();
+
+                // Mostrar notificación
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Éxito',
+                    text: result.message,
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message || 'No se pudo cambiar el estado del plan',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    });
+
+    // Manejar clic en botón de editar
+    $('#planesTable').on('click', '.editar-plan', async function() {
+        const planId = $(this).data('plan-id');
+        
+        try {
+            const response = await fetch(`/planes/${planId}`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': csrfToken
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Error al obtener los datos del plan');
+            }
+
+            const plan = await response.json();
+
+            // Llenar el formulario
+            document.getElementById('planId').value = plan.id;
+            document.getElementById('editNombre').value = plan.nombre;
+            document.getElementById('editVelocidadDescarga').value = plan.velocidad_descarga;
+            document.getElementById('editVelocidadSubida').value = plan.velocidad_subida;
+            document.getElementById('editPrecio').value = plan.precio;
+
+            // Mostrar modal
+            const modal = new bootstrap.Modal(document.getElementById('editarPlanModal'));
+            modal.show();
+        } catch (error) {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message || 'No se pudo cargar los datos del plan',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    });
+
+    // Manejar guardado de cambios
+    document.getElementById('guardarCambios').addEventListener('click', async function() {
+        const planId = document.getElementById('planId').value;
+        const formData = {
+            nombre: document.getElementById('editNombre').value,
+            velocidad_descarga: parseInt(document.getElementById('editVelocidadDescarga').value),
+            velocidad_subida: parseInt(document.getElementById('editVelocidadSubida').value),
+            precio: parseFloat(document.getElementById('editPrecio').value)
+        };
+
+        try {
+            const response = await fetch(`/planes/${planId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': csrfToken
+                },
+                body: JSON.stringify(formData)
+            });
+
+            if (!response.ok) {
+                throw new Error('Error al actualizar el plan');
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Cerrar el modal
+                bootstrap.Modal.getInstance(document.getElementById('editarPlanModal')).hide();
+                
+                // Recargar la tabla
+                table.ajax.reload();
+
+                // Mostrar notificación
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Éxito',
+                    text: result.message,
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message || 'No se pudo actualizar el plan',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    });
+});
+</script>
+
+<%- include('../partials/footer') %> 

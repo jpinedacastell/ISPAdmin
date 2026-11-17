@@ -1,0 +1,33 @@
+<%- include('../partials/header') %>
+
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Perfil</h1>
+        <a href="/dashboard" class="btn btn-outline-secondary">Volver</a>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label text-muted">Nombre</label>
+                    <div class="form-control bg-light"><%= perfil.nombre || 'N/A' %></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted">Usuario</label>
+                    <div class="form-control bg-light"><%= perfil.usuario || 'N/A' %></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted">Correo</label>
+                    <div class="form-control bg-light"><%= perfil.email || 'N/A' %></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted">Creado</label>
+                    <div class="form-control bg-light"><%= perfil.created_at ? new Date(perfil.created_at).toLocaleString() : 'N/A' %></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

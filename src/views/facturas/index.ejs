@@ -1,0 +1,615 @@
+<head>
+    <!-- Core JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Select2 -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<!-- DataTables -->
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<%- include('../partials/header') %>
+
+
+
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Gestión de Facturas</h1>
+        <div class="d-flex gap-2">
+            <a href="/facturacion/resumen-anual/vista" class="btn btn-outline-info">
+                <i class="fas fa-table"></i> Ver Resumen Anual
+            </a>
+            <button id="generarFacturas" class="btn btn-primary">
+                <i class="fas fa-file-invoice"></i> Generar Facturas Mensuales
+            </button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <!-- Filtros -->
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <label for="filtroEstado" class="form-label">Estado</label>
+                    <select id="filtroEstado" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="pendiente">Pendientes</option>
+                        <option value="pagada">Pagadas</option>
+                        <option value="vencida">Vencidas</option>
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Rango de Meses</label>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="input-group">
+                                <span class="input-group-text">Desde</span>
+                                <input type="month" id="filtroMesDesde" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="input-group">
+                                <span class="input-group-text">Hasta</span>
+                                <input type="month" id="filtroMesHasta" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label for="filtroCliente" class="form-label">Cliente</label>
+                    <input type="text" 
+                           id="filtroCliente" 
+                           class="form-control" 
+                           list="clientesList" 
+                           placeholder="Buscar cliente..."
+                           autocomplete="off">
+                    <datalist id="clientesList">
+                        <!-- Las opciones se cargarán dinámicamente -->
+                    </datalist>
+                </div>
+                <div class="col-md-3 mb-3 d-flex align-items-end">
+                    <button id="limpiarFiltros" class="btn btn-secondary">
+                        <i class="fas fa-filter-circle-xmark"></i> Limpiar Filtros
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabla de Facturas -->
+            <div class="table-responsive">
+                <table id="facturasTable" class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nº Factura</th>
+                            <th>Cliente</th>
+                            <th>Plan</th>
+                            <th>Fecha Emisión</th>
+                            <th>Fecha Vencimiento</th>
+                            <th>Mes Facturado</th>
+                            <th>Monto</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Los datos se cargarán dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Pago -->
+<div class="modal fade" id="pagoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar Pago</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="facturaId">
+                <input type="hidden" id="saldoFactura">
+                <div class="alert alert-light border py-2">
+                    <strong>Saldo pendiente:</strong> <span id="saldoFacturaLabel">L 0.00</span>
+                    <div class="small text-muted">Si recibe más del saldo, el excedente se guardará como abono del cliente.</div>
+                </div>
+                <div class="mb-3">
+                    <label for="montoRecibido" class="form-label">Monto recibido</label>
+                    <input type="number" class="form-control" id="montoRecibido" min="0.01" step="0.01">
+                </div>
+                <div class="mb-3">
+                    <label for="metodoPago" class="form-label">Método de Pago</label>
+                    <select id="metodoPago" class="form-select">
+                        <option value="">Seleccione un método</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="tarjeta">Tarjeta</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmarPago">Confirmar Pago</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variable global para la tabla y el temporizador de búsqueda
+let facturasTable;
+let searchTimeout;
+let clientesCache = new Map();
+
+function initializePage() {
+    console.log('Iniciando página...');
+    
+    // Configuración global para todas las solicitudes AJAX
+    $.ajaxSetup({
+        headers: {
+            'CSRF-Token': '<%= csrfToken %>'
+        }
+    });
+
+    // Inicializar DataTable
+    facturasTable = $('#facturasTable').DataTable({
+        ajax: {
+            url: '/facturacion/list',
+            dataSrc: ''
+        },
+        columns: [
+            { data: 'numero_factura' },
+            { 
+                data: null,
+                render: function(data) {
+                    return `${data.cliente_nombre} ${data.cliente_apellido}`;
+                }
+            },
+            { 
+                data: null,
+                render: function(data) {
+                    return `${data.plan_nombre}<br>
+                           <small class="text-muted">
+                               ↓${data.velocidad_descarga}Mbps ↑${data.velocidad_subida}Mbps
+                           </small>`;
+                }
+            },
+            { 
+                data: 'fecha_emision',
+                render: function(data) {
+                    return new Date(data).toLocaleDateString();
+                }
+            },
+            { 
+                data: 'fecha_vencimiento',
+                render: function(data) {
+                    return new Date(data).toLocaleDateString();
+                }
+            },
+            {
+                data: 'mes_facturado',
+                render: function(data) {
+                    const fecha = new Date(data);
+                    const opciones = { 
+                        month: 'long', 
+                        year: 'numeric',
+                        timeZone: 'UTC'
+                    };
+                    return fecha.toLocaleString('es-ES', opciones);
+                }
+            },
+            { 
+                data: 'monto',
+                render: function(data, type, row) {
+                    const total = parseFloat(data || 0);
+                    const saldo = parseFloat(row.saldo_pendiente ?? total);
+                    const aplicado = parseFloat(row.monto_pagado || 0) + parseFloat(row.credito_aplicado || 0);
+
+                    if (aplicado > 0 && saldo > 0) {
+                        return `L ${total.toFixed(2)}<br><small class="text-success">Abonado: L ${aplicado.toFixed(2)}</small><br><small class="text-warning">Saldo: L ${saldo.toFixed(2)}</small>`;
+                    }
+
+                    return `L ${total.toFixed(2)}`;
+                }
+            },
+            {
+                data: 'estado',
+                render: function(data, type, row) {
+                    const abonado = (
+                        data !== 'pagada' &&
+                        (parseFloat(row.monto_pagado || 0) + parseFloat(row.credito_aplicado || 0)) > 0
+                    );
+
+                    if (abonado) {
+                        return '<span class="badge bg-info">ABONADA</span>';
+                    }
+
+                    const badges = {
+                        'pendiente': 'bg-warning',
+                        'pagada': 'bg-success',
+                        'vencida': 'bg-danger'
+                    };
+                    return `<span class="badge ${badges[data]}">${data.toUpperCase()}</span>`;
+                }
+            },
+            {
+                data: null,
+                orderable: false,
+                render: function(data) {
+                    const verFactura = `
+                        <a href="/facturacion/${data.id}/ver" class="btn btn-sm btn-info me-1" title="Ver Factura">
+                            <i class="fas fa-eye"></i>
+                        </a>`;
+                    
+                    const saldo = parseFloat(data.saldo_pendiente ?? data.monto ?? 0);
+                    const registrarPago = data.estado !== 'pagada' ? `
+                        <button class="btn btn-sm btn-success registrar-pago" 
+                                data-factura-id="${data.id}"
+                                data-saldo="${saldo.toFixed(2)}"
+                                title="Registrar Pago">
+                            <i class="fas fa-money-bill"></i>
+                        </button>` : '';
+
+                    return verFactura + registrarPago;
+                }
+            }
+        ],
+        order: [[3, 'desc']],
+        language: {
+            processing: "Procesando...",
+            search: "Buscar:",
+            lengthMenu: "Mostrar _MENU_ registros",
+            info: "Mostrando registros del _START_ al _END_ de un total de _TOTAL_ registros",
+            infoEmpty: "Mostrando registros del 0 al 0 de un total de 0 registros",
+            infoFiltered: "(filtrado de un total de _MAX_ registros)",
+            infoPostFix: "",
+            loadingRecords: "Cargando...",
+            zeroRecords: "No se encontraron resultados",
+            emptyTable: "Ningún dato disponible en esta tabla",
+            paginate: {
+                first: "Primero",
+                previous: "Anterior",
+                next: "Siguiente",
+                last: "Último"
+            }
+        },
+        responsive: true,
+        pageLength: 10
+    });
+
+    // Inicializar los filtros de mes con valores por defecto
+    const now = new Date();
+    const currentMonth = now.toISOString().slice(0, 7);
+    
+    // Establecer el mes "desde" como 3 meses atrás
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(now.getMonth() - 3);
+    const fromMonth = threeMonthsAgo.toISOString().slice(0, 7);
+    
+    $('#filtroMesDesde').val(fromMonth);
+    $('#filtroMesHasta').val(currentMonth);
+
+    // Validar que la fecha "hasta" no sea menor que la fecha "desde"
+    $('#filtroMesDesde, #filtroMesHasta').on('change', function() {
+        const desde = $('#filtroMesDesde').val();
+        const hasta = $('#filtroMesHasta').val();
+        
+        if (desde && hasta && desde > hasta) {
+            if (this.id === 'filtroMesDesde') {
+                $('#filtroMesHasta').val(desde);
+            } else {
+                $('#filtroMesDesde').val(hasta);
+            }
+        }
+        aplicarFiltros();
+    });
+
+    // Manejar la búsqueda de clientes
+    $('#filtroCliente').on('input', function() {
+        const searchTerm = this.value.trim();
+        
+        // Limpiar el temporizador anterior
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+
+        // Si el término de búsqueda es muy corto, no hacer nada
+        if (searchTerm.length < 2) {
+            return;
+        }
+
+        // Establecer un nuevo temporizador para la búsqueda
+        searchTimeout = setTimeout(async function() {
+            try {
+                // Primero, buscar en el cache
+                if (clientesCache.has(searchTerm)) {
+                    actualizarListaClientes(clientesCache.get(searchTerm));
+                    return;
+                }
+
+                const response = await fetch(`/clientes/list?search=${encodeURIComponent(searchTerm)}`);
+                if (!response.ok) {
+                    throw new Error('Error al buscar clientes');
+                }
+
+                const clientes = await response.json();
+                
+                // Guardar en cache
+                clientesCache.set(searchTerm, clientes);
+                
+                // Actualizar la lista
+                actualizarListaClientes(clientes);
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }, 300);
+    });
+
+    // Función para actualizar la lista de clientes
+    function actualizarListaClientes(clientes) {
+        const datalist = document.getElementById('clientesList');
+        datalist.innerHTML = '';
+        
+        clientes.forEach(cliente => {
+            const option = document.createElement('option');
+            option.value = `${cliente.nombre} ${cliente.apellido} - ${cliente.dni || 'Sin DNI'}`;
+            option.dataset.id = cliente.id;
+            datalist.appendChild(option);
+        });
+    }
+
+    // Función para aplicar filtros
+    function aplicarFiltros() {
+        const estado = $('#filtroEstado').val();
+        const mesDesde = $('#filtroMesDesde').val();
+        const mesHasta = $('#filtroMesHasta').val();
+        const clienteTexto = $('#filtroCliente').val().toLowerCase();
+
+        // Limpiar filtros anteriores
+        $.fn.dataTable.ext.search = [];
+
+        if (estado || mesDesde || mesHasta || clienteTexto) {
+            $.fn.dataTable.ext.search.push((settings, data, dataIndex) => {
+                const row = facturasTable.row(dataIndex).data();
+                if (!row) return true;
+
+                let cumpleFiltros = true;
+
+                // Filtro por estado
+                if (estado && row.estado !== estado) {
+                    cumpleFiltros = false;
+                }
+
+                // Filtro por rango de meses
+                if ((mesDesde || mesHasta) && cumpleFiltros) {
+                    const fechaFactura = new Date(row.mes_facturado);
+                    const mesFactura = fechaFactura.toISOString().slice(0, 7);
+
+                    if (mesDesde && mesFactura < mesDesde) {
+                        cumpleFiltros = false;
+                    }
+                    if (mesHasta && mesFactura > mesHasta) {
+                        cumpleFiltros = false;
+                    }
+                }
+
+                // Filtro por cliente
+                if (clienteTexto && cumpleFiltros) {
+                    const nombreCompleto = `${row.cliente_nombre} ${row.cliente_apellido}`.toLowerCase();
+                    const dni = (row.cliente_dni || '').toLowerCase();
+                    const terminosBusqueda = clienteTexto.split(/[\s-]+/).filter(t => t);
+
+                    cumpleFiltros = terminosBusqueda.every(termino => 
+                        nombreCompleto.includes(termino) || 
+                        dni.includes(termino)
+                    );
+                }
+
+                return cumpleFiltros;
+            });
+        }
+
+        facturasTable.draw();
+    }
+
+    // Eventos de filtros
+    $('#filtroEstado, #filtroCliente').on('change', aplicarFiltros);
+
+    // Limpiar filtros
+    $('#limpiarFiltros').on('click', function() {
+        $('#filtroEstado').val('');
+        $('#filtroMesDesde').val(fromMonth);
+        $('#filtroMesHasta').val(currentMonth);
+        $('#filtroCliente').val('');
+        aplicarFiltros();
+    });
+
+    // Generar facturas mensuales
+    $('#generarFacturas').on('click', async function() {
+        try {
+            const { value: formValues } = await Swal.fire({
+                title: 'Generar facturas mensuales',
+                html: `
+                    <div class="mb-3">
+                        <label for="mes-facturacion" class="form-label">Seleccione el mes a facturar</label>
+                        <input type="month" id="mes-facturacion" class="form-control" value="${(() => {
+                            const fecha = new Date();
+                            fecha.setMonth(fecha.getMonth() - 1);
+                            return fecha.toISOString().slice(0, 7);
+                        })()}">
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Generar',
+                cancelButtonText: 'Cancelar',
+                preConfirm: () => {
+                    const mesSeleccionado = document.getElementById('mes-facturacion').value;
+                    return {
+                        fecha: mesSeleccionado + '-01'
+                    }
+                }
+            });
+
+            if (!formValues) return;
+
+            Swal.fire({
+                title: 'Generando facturas...',
+                text: 'Por favor espere',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            const response = await fetch('/facturacion/generar-mensual', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': '<%= csrfToken %>'
+                },
+                body: JSON.stringify(formValues)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Error en la petición');
+            }
+
+            if (result.success) {
+                let message = result.message;
+                if (result.errores && result.errores.length > 0) {
+                    message += '\n\nDetalles de errores:\n' + result.errores.join('\n');
+                }
+
+                await Swal.fire({
+                    icon: result.errores && result.errores.length > 0 ? 'warning' : 'success',
+                    title: result.errores && result.errores.length > 0 ? 'Completado con advertencias' : 'Éxito',
+                    text: message,
+                    confirmButtonText: 'Aceptar'
+                });
+
+                // Actualizar el filtro de mes al mes generado
+                const fechaGenerada = new Date(formValues.fecha);
+                const mesGenerado = fechaGenerada.toISOString().slice(0, 7);
+                $('#filtroMesDesde').val(mesGenerado);
+                $('#filtroMesHasta').val(mesGenerado);
+                
+                // Recargar la tabla y aplicar el filtro
+                await facturasTable.ajax.reload();
+                aplicarFiltros();
+            } else {
+                throw new Error(result.error || 'Error al generar facturas');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message || 'No se pudieron generar las facturas',
+                confirmButtonText: 'Aceptar'
+            });
+        }
+    });
+
+    // Registrar pago
+    $(document).on('click', '.registrar-pago', function() {
+        const facturaId = $(this).data('factura-id');
+        const saldo = parseFloat($(this).data('saldo')) || 0;
+
+        $('#facturaId').val(facturaId);
+        $('#saldoFactura').val(saldo.toFixed(2));
+        $('#saldoFacturaLabel').text(`L ${saldo.toFixed(2)}`);
+        $('#montoRecibido').val(saldo.toFixed(2));
+        $('#metodoPago').val('');
+        $('#pagoModal').modal('show');
+    });
+
+    // Confirmar pago
+    $('#confirmarPago').click(async function() {
+        const facturaId = $('#facturaId').val();
+        const metodoPago = $('#metodoPago').val();
+        const montoRecibido = parseFloat($('#montoRecibido').val());
+
+        if (!metodoPago) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atención',
+                text: 'Por favor seleccione un método de pago'
+            });
+            return;
+        }
+
+        if (!Number.isFinite(montoRecibido) || montoRecibido <= 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Atención',
+                text: 'Ingrese un monto recibido mayor a cero'
+            });
+            return;
+        }
+
+        try {
+            const response = await fetch(`/facturacion/${facturaId}/pago`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': '<%= csrfToken %>'
+                },
+                body: JSON.stringify({
+                    metodo_pago: metodoPago,
+                    monto_recibido: montoRecibido
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const abono = Number(result.data?.abono_generado || 0);
+                $('#pagoModal').modal('hide');
+                facturasTable.ajax.reload();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Éxito',
+                    text: abono > 0
+                        ? `Pago registrado. Abono a favor: L ${abono.toFixed(2)}`
+                        : 'Pago registrado correctamente',
+                    toast: true,
+                    position: 'top-end',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            } else {
+                throw new Error(result.error || 'Error al registrar el pago');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message || 'No se pudo registrar el pago',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000
+            });
+        }
+    });
+}
+
+// Iniciar cuando el documento esté listo
+$(document).ready(function() {
+    initializePage();
+});
+</script>
+
+<%- include('../partials/footer') %>

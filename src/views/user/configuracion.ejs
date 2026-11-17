@@ -1,0 +1,34 @@
+<%- include('../partials/header') %>
+
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Configuración</h1>
+        <a href="/dashboard" class="btn btn-outline-secondary">Volver</a>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-header">
+            <h6 class="m-0 font-weight-bold text-primary">Cambiar Contraseña</h6>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/configuracion/password">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <div class="mb-3">
+                    <label for="passwordActual" class="form-label">Contraseña actual</label>
+                    <input type="password" class="form-control" id="passwordActual" name="passwordActual" required>
+                </div>
+                <div class="mb-3">
+                    <label for="passwordNuevo" class="form-label">Nueva contraseña</label>
+                    <input type="password" class="form-control" id="passwordNuevo" name="passwordNuevo" minlength="6" required>
+                </div>
+                <div class="mb-3">
+                    <label for="passwordConfirmacion" class="form-label">Confirmar nueva contraseña</label>
+                    <input type="password" class="form-control" id="passwordConfirmacion" name="passwordConfirmacion" minlength="6" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

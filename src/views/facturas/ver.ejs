@@ -1,0 +1,1412 @@
+<%- include('../partials/header') %>
+
+<!-- Agregar las librerías necesarias -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    // Almacenar el ID de la factura
+    const facturaId = <%= JSON.stringify(factura.id) %>;
+
+    // Funciones para manejar los modales
+    function openDiscountModal() {
+        document.getElementById('discountModal').style.display = 'block';
+    }
+
+    
+    function closeDiscountModal() {
+        document.getElementById('discountModal').style.display = 'none';
+        document.getElementById('discountPercentage').value = '';
+        document.getElementById('discountReason').value = '';
+    }
+
+    function openExtensionModal() {
+        document.getElementById('extensionModal').style.display = 'block';
+    }
+
+    function closeExtensionModal() {
+        document.getElementById('extensionModal').style.display = 'none';
+        document.getElementById('extensionDays').value = '';
+        document.getElementById('extensionReason').value = '';
+    }
+
+    // Funciones para aplicar descuentos y prórrogas
+    async function applyDiscount() {
+        const percentage = document.getElementById('discountPercentage').value;
+        const reason = document.getElementById('discountReason').value;
+        
+        try {
+            const response = await fetch('/facturacion/descuento', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({
+                    idFactura: JSON.parse(facturaId),
+                    porcentaje: percentage,
+                    motivo: reason
+                })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Éxito!',
+                    text: 'Descuento aplicado correctamente'
+                }).then(() => {
+                    location.reload();
+                });
+            } else if (data.message === 'Ya existe un descuento aplicado a esta factura') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: '¡Atención!',
+                    text: 'Ya existe un descuento aplicado a esta factura. No se puede aplicar otro descuento.'
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: data.message || 'Error al aplicar descuento'
+                });
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Error al procesar la solicitud'
+            });
+        }
+    }
+
+    async function applyExtension() {
+        const days = document.getElementById('extensionDays').value;
+        const reason = document.getElementById('extensionReason').value;
+        
+        try {
+            const response = await fetch('/facturacion/prorroga', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({
+                    idFactura: JSON.parse(facturaId),
+                    dias: days,
+                    motivo: reason
+                })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Éxito!',
+                    text: 'Prórroga aplicada correctamente'
+                }).then(() => {
+                    location.reload();
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: data.message || 'Error al aplicar prórroga'
+                });
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Error al procesar la solicitud'
+            });
+        }
+    }
+</script>
+
+
+<style>
+/* Estilos para los botones de acción */
+.action-buttons {
+    margin-top: 20px;
+}
+
+.action-buttons .btn {
+    margin-right: 10px;
+    padding: 8px 20px;
+    border-radius: 4px;
+}
+
+.discount-modal, .extension-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    margin: 50px auto;
+}
+
+.modal-header {
+    margin-bottom: 15px;
+}
+
+.modal-header h4 {
+    margin: 0;
+    color: #333;
+}
+
+.close-modal {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    cursor: pointer;
+    color: #666;
+}
+
+.modal-form-group {
+    margin-bottom: 15px;
+}
+
+.modal-form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #555;
+}
+
+.modal-form-group input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+</style>
+
+<style>
+/* Base Styles */
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Invoice Card */
+.premium-invoice {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    position: relative;
+    padding: 0.5rem !important;
+}
+
+.watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 100px;
+    font-weight: 800;
+    color: rgba(0, 123, 255, 0.03);
+    z-index: 0;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Info Cards */
+.info-card {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 10px;
+    height: 100%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    position: relative;
+    z-index: 1;
+}
+
+.info-card-title {
+    color: #4e9af1;
+    font-size: 15px;
+    margin-bottom: 8px;
+    border-bottom: 1px dashed #e0e0e0;
+    padding-bottom: 6px;
+}
+
+.info-card-body p {
+    margin-bottom: 4px;
+    font-size: 13px;
+}
+
+.details-table {
+    width: 100%;
+}
+
+.details-table tr td {
+    padding: 3px 0;
+    border-bottom: 1px dashed #f0f0f0;
+    font-size: 13px;
+}
+
+.details-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Invoice Table */
+.invoice-items {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.invoice-items thead th {
+    background-color: #e3f2fd !important;
+    color: #0d47a1;
+    font-weight: 600;
+    padding: 8px 10px;
+    font-size: 13px;
+}
+
+.invoice-items tbody td {
+    padding: 8px 10px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+}
+
+.invoice-items tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.divider-row td {
+    background-color: #f8f9fa;
+    height: 1px;
+    padding: 0 !important;
+}
+
+/* Totals Section */
+.invoice-totals-card {
+    background-color: #f8fafc;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.totals-table {
+    width: 100%;
+}
+
+.totals-table td {
+    padding: 4px 0;
+    border-bottom: 1px dashed #e0e0e0;
+    font-size: 13px;
+}
+
+.totals-table tr:last-child td {
+    border-bottom: none;
+}
+
+.total-row td {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0d47a1;
+}
+
+.paid-row {
+    background-color: rgba(40, 167, 69, 0.1);
+}
+
+.pending-row {
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+/* Payment Notes */
+.payment-notes {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 10px;
+    height: 100%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.payment-notes ul {
+    padding-left: 20px;
+    margin-bottom: 0;
+    font-size: 12px;
+}
+
+.section-title {
+    color: #4e9af1;
+    font-size: 15px;
+    margin-bottom: 8px;
+    border-bottom: 1px dashed #e0e0e0;
+    padding-bottom: 6px;
+}
+
+/* Invoice Footer */
+.invoice-footer {
+    font-size: 11px;
+    margin-top: 0.5rem !important;
+    padding-top: 0.3rem !important;
+}
+
+/* Estilos para la tarjeta de referidos */
+.referral-card {
+    background: linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%);
+    border-radius: 12px;
+    padding: 12px;
+    color: white;
+    box-shadow: 0 10px 20px rgba(78, 84, 200, 0.2);
+    margin-bottom: 10px;
+    position: relative;
+    overflow: hidden;
+}
+
+.referral-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+    animation: shine 3s infinite;
+}
+
+@keyframes shine {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.referral-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.referral-icon {
+    font-size: 2.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.referral-text h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
+
+.referral-text p {
+    font-size: 1rem;
+    margin-bottom: 8px;
+    opacity: 0.9;
+}
+
+.referral-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.referral-features span {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Ajustes para impresión */
+@media print {
+    body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    .premium-invoice {
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: 1px solid #eee !important;
+    }
+    
+    .card-body {
+        padding: 0.3rem !important;
+    }
+    
+    .watermark {
+        opacity: 0.03 !important;
+    }
+    
+    .referral-card {
+        background: #4e54c8 !important;
+        box-shadow: none !important;
+        border: 1px solid #4e54c8 !important;
+    }
+    
+    .info-card, .payment-notes, .invoice-totals-card {
+        box-shadow: none !important;
+        border: 1px solid #eee !important;
+    }
+    
+    .text-primary {
+        color: #000 !important;
+    }
+}
+.pdf-generating .premium-invoice {
+    width: 16cm !important;
+    max-width: 16cm !important;
+    min-width: 16cm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+}
+
+.pdf-generating .premium-invoice .card-body {
+    padding: 0.55cm !important;
+}
+
+.pdf-generating .premium-invoice .row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+}
+
+.pdf-generating .premium-invoice .col-md-6 {
+    flex: 0 0 auto !important;
+    width: 50% !important;
+}
+
+.pdf-generating .premium-invoice .text-md-end {
+    text-align: right !important;
+}
+
+.pdf-generating .premium-invoice .mb-4 {
+    margin-bottom: 0.85rem !important;
+}
+
+.pdf-generating .premium-invoice .mt-4 {
+    margin-top: 0.85rem !important;
+}
+
+.pdf-generating .premium-invoice img[alt="CONETXA Logo"] {
+    height: 54px !important;
+}
+
+.pdf-generating .watermark {
+    font-size: 92px !important;
+}
+
+.pdf-generating .info-card,
+.pdf-generating .payment-notes,
+.pdf-generating .invoice-totals-card {
+    padding: 8px !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+}
+
+.pdf-generating .info-card-title,
+.pdf-generating .section-title {
+    font-size: 14px !important;
+    margin-bottom: 6px !important;
+    padding-bottom: 5px !important;
+}
+
+.pdf-generating .info-card-body p,
+.pdf-generating .details-table tr td,
+.pdf-generating .invoice-items tbody td,
+.pdf-generating .totals-table td,
+.pdf-generating .payment-notes ul {
+    font-size: 11.5px !important;
+    line-height: 1.35 !important;
+    overflow-wrap: anywhere;
+}
+
+.pdf-generating .details-table tr td,
+.pdf-generating .totals-table td {
+    padding: 3px 0 !important;
+}
+
+.pdf-generating .invoice-items thead th {
+    padding: 7px 8px !important;
+    font-size: 11px !important;
+}
+
+.pdf-generating .invoice-items tbody td {
+    padding: 7px 8px !important;
+}
+
+.pdf-generating .payment-notes ul {
+    padding-left: 14px !important;
+}
+
+.pdf-generating .total-row td {
+    font-size: 15px !important;
+}
+
+.pdf-generating .referral-card {
+    padding: 11px !important;
+    margin-bottom: 7px !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+}
+
+.pdf-generating .referral-card::before {
+    display: none !important;
+}
+
+.pdf-generating .referral-content {
+    flex-direction: row !important;
+    text-align: left !important;
+    gap: 12px !important;
+}
+
+.pdf-generating .referral-icon {
+    width: 48px !important;
+    height: 48px !important;
+    font-size: 1.8rem !important;
+}
+
+.pdf-generating .referral-text h3 {
+    font-size: 20px !important;
+    margin-bottom: 4px !important;
+}
+
+.pdf-generating .referral-text p {
+    font-size: 11px !important;
+    margin-bottom: 6px !important;
+}
+
+.pdf-generating .referral-features {
+    justify-content: flex-start !important;
+    gap: 6px !important;
+    margin-bottom: 0 !important;
+}
+
+.pdf-generating .referral-features span {
+    padding: 3px 8px !important;
+    font-size: 9.5px !important;
+}
+
+.pdf-generating .invoice-footer {
+    margin-top: 0.85rem !important;
+    padding-top: 0.5rem !important;
+}
+
+.pdf-generating .invoice-footer p {
+    font-size: 9.5px !important;
+    line-height: 1.25 !important;
+}
+
+/* Ajustes responsivos */
+@media (max-width: 768px) {
+    .info-card {
+        margin-bottom: 15px;
+    }
+    
+    .referral-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .referral-features {
+        justify-content: center;
+    }
+    
+    .referral-text h3 {
+        font-size: 1.3rem;
+    }
+}
+</style>
+
+<%
+const totalFactura = Math.max(
+    Number(factura.monto || 0) - Number(factura.descuento_monto || 0),
+    0
+);
+const montoPagado = Number(factura.monto_pagado || 0);
+const pagoRecibido = Number(factura.pago_recibido || 0);
+const creditoAplicado = Number(factura.credito_aplicado || 0);
+const abonoSiguiente = Number(factura.abono_siguiente || 0);
+const saldoPendiente = Math.max(totalFactura - montoPagado - creditoAplicado, 0);
+%>
+
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="text-primary"><i class="fas fa-file-invoice me-2"></i>Comprobante  #<%= factura.numero_factura %></h1>
+        <div class="d-print-none">
+    <% if (factura.estado !== 'pagada') { %>
+        <button class="btn btn-success me-2" onclick="registrarPago()">
+            <i class="fas fa-money-bill-wave me-1"></i> Registrar Pago
+        </button>
+        <button class="btn btn-warning me-2" onclick="openDiscountModal()">
+            <i class="fas fa-percentage me-1"></i> Aplicar Descuento
+        </button>
+    <% } %>
+    <button id="downloadPdfBtn" class="btn btn-primary me-2" onclick="generarPDF()">
+        <i class="fas fa-download me-1"></i> Descargar PDF
+    </button>
+    <button id="sharePdfBtn" class="btn btn-outline-success me-2" onclick="enviarPDFWhatsApp()">
+        <i class="fab fa-whatsapp me-1"></i> Enviar WhatsApp
+    </button>
+    <% if (factura.cliente_id) { %>
+        <a href="/clientes/<%= factura.cliente_id %>/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Volver
+        </a>
+    <% } else { %>
+        <a href="/facturacion" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Volver
+        </a>
+    <% } %>
+</div>
+    </div>
+
+    <div class="card premium-invoice">
+        <div class="card-body p-4">
+            <!-- Header with Watermark -->
+            <div class="position-relative">
+                <div class="watermark">CONETXA</div>
+                
+                <!-- Company Header -->
+<div class="row align-items-center mb-4">
+    <div class="col-md-6">
+        <div class="d-flex align-items-center">
+            <img src="/img/Logo.png" alt="CONETXA Logo" class="me-3" style="height: 60px;">
+            <div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <p class="mb-1"><small class="text-muted">Fecha de emisión: <%= new Date(factura.fecha_emision).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' }) %></small></p>
+        <p class="mb-0">
+            <span class="badge <%= factura.estado === 'pagada' ? 'bg-success' : (factura.estado === 'vencida' ? 'bg-danger' : 'bg-warning') %>">
+                <%= factura.estado.toUpperCase() %>
+            </span>
+        </p>
+    </div>
+</div>
+            </div>
+
+            <!-- Client and Company Info -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="info-card">
+                        <h5 class="info-card-title"><i class="fas fa-building me-2"></i>Empresa</h5>
+                        <div class="info-card-body">
+                            <p class="mb-1"><strong>CONETXA</strong></p>
+                            <p class="mb-1">Cofradia, Cortes, Honduras</p>
+                            <p class="mb-1"><i class="fas fa-phone-alt me-2"></i>(504) 8780-3554</p>
+                            <p class="mb-1"><i class="fas fa-envelope me-2"></i>info@conetxahn.com</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="info-card">
+                        <h5 class="info-card-title"><i class="fas fa-user me-2"></i>Cliente</h5>
+                        <div class="info-card-body">
+                            <p class="mb-1"><strong><%= factura.cliente_nombre %> <%= factura.cliente_apellido %></strong></p>
+                            <p class="mb-1"><i class="fas fa-id-card me-2"></i>DNI: <%= factura.cliente_dni %></p>
+                            <p class="mb-1"><i class="fas fa-envelope me-2"></i><%= factura.cliente_email %></p>
+                            <p class="mb-1"><i class="fas fa-mobile-alt me-2"></i><%= factura.cliente_telefono %></p>
+                            <p class="mb-0"><i class="fas fa-map-marker-alt me-2"></i><%= factura.cliente_direccion %></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invoice and Service Details -->
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="info-card">
+                        <h5 class="info-card-title"><i class="fas fa-file-alt me-2"></i>Detalles del Comprobante</h5>
+                        <div class="info-card-body">
+                            <table class="table details-table">
+                                <tr>
+                                    <td><strong>Número:</strong></td>
+                                    <td><%= factura.numero_factura %></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Emisión:</strong></td>
+                                    <td><%= new Date(factura.fecha_emision).toLocaleDateString('es-ES') %></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Vencimiento:</strong></td>
+                                    <td><%= new Date(factura.fecha_vencimiento).toLocaleDateString('es-ES') %></td>
+                                </tr>
+	                                <% if (factura.estado === 'pagada') { %>
+	                                <tr>
+	                                    <td><strong>Pago:</strong></td>
+	                                    <td><%= new Date(factura.fecha_pago).toLocaleDateString('es-ES') %></td>
+                                </tr>
+                                <tr>
+	                                    <td><strong>Método:</strong></td>
+	                                    <td><%= factura.metodo_pago %></td>
+	                                </tr>
+	                                <% } %>
+                                    <% if (pagoRecibido > 0) { %>
+                                    <tr>
+                                        <td><strong>Recibido:</strong></td>
+                                        <td>L <%= pagoRecibido.toFixed(2) %></td>
+                                    </tr>
+                                    <% } %>
+                                    <% if (abonoSiguiente > 0) { %>
+                                    <tr>
+                                        <td><strong>Abono:</strong></td>
+                                        <td>L <%= abonoSiguiente.toFixed(2) %></td>
+                                    </tr>
+                                    <% } %>
+	                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="info-card">
+                        <h5 class="info-card-title"><i class="fas fa-wifi me-2"></i>Detalles del Servicio</h5>
+                        <div class="info-card-body">
+                            <table class="table details-table">
+                                <tr>
+                                    <td><strong>Plan:</strong></td>
+                                    <td><%= factura.plan_nombre %></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Velocidad:</strong></td>
+                                    <td><%= factura.velocidad_descarga %>/<%= factura.velocidad_subida %> Mbps</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Período:</strong></td>
+                                    <td>
+                                        <% 
+                                        // Convertir mes_facturado a objeto Date
+                                        const mesFacturado = new Date(factura.mes_facturado);
+                                        
+                                        // Opciones de formato
+                                        const opciones = { 
+                                            month: 'long', 
+                                            year: 'numeric',
+                                            timeZone: 'UTC'
+                                        };
+                                        
+                                        // Mostrar el mes y año (ej. "diciembre 2024")
+                                        %>
+                                        <%= mesFacturado.toLocaleString('es-ES', opciones) %>
+                                        
+                                        <!-- Mostrar badge si es facturación adelantada -->
+                                        <% if (new Date(factura.mes_facturado) > new Date()) { %>
+                                            <span class="badge bg-info">Mes futuro</span>
+                                        <% } else if (new Date(factura.mes_facturado) < new Date()) { %>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invoice Items -->
+            <div class="invoice-details mb-4">
+                <div class="table-responsive">
+                    <table class="table invoice-items">
+                        <thead>
+                            <tr>
+                                <th class="bg-light-primary">Descripción</th>
+                                <th class="bg-light-primary text-center" width="100">Unidades</th>
+                                <th class="bg-light-primary text-end" width="120">Precio Unitario</th>
+                                <th class="bg-light-primary text-end" width="120">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <strong><%= factura.plan_nombre %></strong>
+                                    <div class="text-muted small">Servicio de internet - <%= mesFacturado.toLocaleString('es-ES', opciones) %></div>
+                                </td>
+                                <td class="text-center">1</td>
+                                <td class="text-end">L <%= parseFloat(factura.monto).toFixed(2) %></td>
+                                <td class="text-end">L <%= parseFloat(factura.monto).toFixed(2) %></td>
+                            </tr>
+                            <tr class="divider-row">
+                                <td colspan="4"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Action Buttons
+            <div class="action-buttons">
+                
+                <button class="btn btn-success" onclick="openExtensionModal()">
+                    <i class="fas fa-clock me-2"></i>Prorrogar Pago
+                </button>
+            </div> -->
+
+            <!-- Discount Modal -->
+            <div class="discount-modal" id="discountModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4>Aplicar Descuento</h4>
+                        <span class="close-modal" onclick="closeDiscountModal()">&times;</span>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="discountPercentage">Porcentaje de descuento:</label>
+                        <input type="number" id="discountPercentage" min="0" max="100" step="0.1" required>
+                    </div>
+                    <div class="modal-form-group">
+                         <label for="discountReason">Motivo del descuento:</label>
+                        <textarea id="discountReason" rows="3" required></textarea>
+                    </div>
+                    <div class="modal-form-group">
+                        <button class="btn btn-primary" onclick="applyDiscount()">Aplicar Descuento</button>
+                        <button class="btn btn-secondary" onclick="closeDiscountModal()">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Extension Modal -->
+            <div class="extension-modal" id="extensionModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4>Prorrogar Pago</h4>
+                        <span class="close-modal" onclick="closeExtensionModal()">&times;</span>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="extensionDays">Días de prórroga:</label>
+                        <input type="number" id="extensionDays" min="1" required>
+                    </div>
+                    <div class="modal-form-group">
+                         <label for="extensionReason">Motivo de la prórroga:</label>
+                        <textarea id="extensionReason" rows="3" required></textarea>
+                    </div>
+                    <div class="modal-form-group">
+                        <button class="btn btn-success" onclick="applyExtension()">Prorrogar Pago</button>
+                        <button class="btn btn-secondary" onclick="closeExtensionModal()">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Totals and Payment Info -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="payment-notes">
+                        <h5 class="section-title"><i class="fas fa-info-circle me-2"></i>Notas</h5>
+                        <ul>
+                            <li>El pago debe realizarse antes de la fecha de vencimiento</li>
+                            <li>Para cualquier consulta, contacte a nuestro servicio al cliente</li>
+                            <li>Conserve este documento para futuras referencias</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="invoice-totals-card">
+                        <table class="table totals-table">
+                            <tr>
+                                <td>Subtotal:</td>
+                                <td class="text-end">L <%= parseFloat(factura.monto).toFixed(2) %></td>
+                            </tr>
+                            <% 
+                                // Manejar descuento único
+                                if (factura.descuento_porcentaje > 0) { 
+                            %>
+                                <tr>
+                                    <td>Descuento:</td>
+                                    <td class="text-end">L <%= parseFloat(factura.descuento_monto).toFixed(2) %></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted ps-4">- <%= factura.motivo_descuento %></td>
+                                    <td class="text-end text-muted">(<%= factura.descuento_porcentaje %>%)</td>
+                                </tr>
+                            <% } else { %>
+                                <tr>
+                                    <td>Descuento:</td>
+                                    <td class="text-end">L 0.00</td>
+                                </tr>
+                            <% } %>
+                                <tr>
+                                    <td>Total factura:</td>
+                                    <td class="text-end">L <%= totalFactura.toFixed(2) %></td>
+                                </tr>
+                                <% if (creditoAplicado > 0) { %>
+                                <tr>
+                                    <td>Saldo a favor aplicado:</td>
+                                    <td class="text-end text-success">- L <%= creditoAplicado.toFixed(2) %></td>
+                                </tr>
+                                <% } %>
+                                <% if (montoPagado > 0) { %>
+                                <tr>
+                                    <td>Pago aplicado:</td>
+                                    <td class="text-end text-success">- L <%= montoPagado.toFixed(2) %></td>
+                                </tr>
+                                <% } %>
+                                <% if (abonoSiguiente > 0) { %>
+                                <tr>
+                                    <td>Abono a próximas facturas:</td>
+                                    <td class="text-end text-info">L <%= abonoSiguiente.toFixed(2) %></td>
+                                </tr>
+                                <% } %>
+	                            <tr class="total-row">
+	                                <td><strong>SALDO:</strong></td>
+	                                <td class="text-end"><strong>L <%= saldoPendiente.toFixed(2) %></strong></td>
+	                            </tr>
+                            <% if(factura.estado === 'pagada') { %>
+                                <tr class="paid-row">
+                                    <td colspan="2" class="text-center text-success">
+                                        <i class="fas fa-check-circle me-2"></i> PAGADO
+                                    </td>
+                                </tr>
+                            <% } else { %>
+                                <tr class="pending-row">
+                                    <td colspan="2" class="text-center text-warning">
+                                        <i class="fas fa-exclamation-circle me-2"></i> PENDIENTE
+                                    </td>
+                                </tr>
+                            <% } %>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Promoción de Referidos -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="referral-card">
+                        <div class="referral-content">
+                            <div class="referral-icon">
+                                <i class="fas fa-gift"></i>
+                            </div>
+                            <div class="referral-text">
+                                <h3>¡GANA 1 MES GRATIS!</h3>
+                                <p>Por cada amigo que refieras y se suscriba a nuestro servicio</p>
+                                <div class="referral-features">
+                                    <span><i class="fas fa-check-circle"></i> Sin límite de referidos</span>
+                                    <span><i class="fas fa-check-circle"></i> Acumulable</span>
+                                    <span><i class="fas fa-check-circle"></i> Sin condiciones</span>
+                                </div>
+                            
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="invoice-footer mt-4 pt-3 border-top">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="small text-muted mb-1">Este documento es un comprobante electrónico válido</p>
+                        <p class="small text-muted mb-0">No requiere firma ni sello</p>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <p class="small text-muted mb-0">Generado el: <%= new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function waitForPdfLayout() {
+    return new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+}
+
+function waitForInvoiceImages(element) {
+    const images = Array.from(element.querySelectorAll('img'));
+
+    return Promise.all(images.map((image) => {
+        if (image.complete) {
+            return Promise.resolve();
+        }
+
+        return new Promise((resolve) => {
+            image.addEventListener('load', resolve, { once: true });
+            image.addEventListener('error', resolve, { once: true });
+        });
+    }));
+}
+
+function getPdfConstructor() {
+    if (window.jspdf && window.jspdf.jsPDF) {
+        return window.jspdf.jsPDF;
+    }
+
+    if (window.jsPDF) {
+        return window.jsPDF;
+    }
+
+    return null;
+}
+
+const reciboPdfFilename = <%- JSON.stringify(mesFacturado.toLocaleString('es-ES', opciones) + ' - ' + factura.cliente_nombre + ' ' + factura.cliente_apellido + ' - ' + factura.numero_factura + '.pdf') %>;
+const reciboShareTitle = <%- JSON.stringify('Recibo CONETXA ' + factura.numero_factura) %>;
+const reciboShareText = <%- JSON.stringify('Hola ' + (factura.cliente_nombre || '') + ', le comparto su recibo de CONETXA ' + factura.numero_factura + '.') %>;
+const clienteWhatsAppTelefono = <%- JSON.stringify(factura.cliente_telefono || '') %>;
+const saldoFacturaActual = <%= JSON.stringify(Number(saldoPendiente.toFixed(2))) %>;
+
+function setPdfButtonsDisabled(disabled) {
+    const downloadButton = document.getElementById('downloadPdfBtn');
+    const shareButton = document.getElementById('sharePdfBtn');
+
+    if (downloadButton) {
+        downloadButton.disabled = disabled;
+    }
+
+    if (shareButton) {
+        shareButton.disabled = disabled;
+    }
+}
+
+function getHtml2PdfOptions() {
+    return {
+        margin: 0.25,
+        filename: reciboPdfFilename,
+        image: { type: 'jpeg', quality: 0.99 },
+        html2canvas: {
+            scale: 2,
+            useCORS: true
+        },
+        jsPDF: {
+            unit: 'cm',
+            format: 'a4',
+            orientation: 'portrait'
+        }
+    };
+}
+
+async function crearPdfRecibo(allowDownloadFallback = false) {
+    const element = document.querySelector('.premium-invoice');
+
+    if (!element) {
+        throw new Error('No se encontró el comprobante para generar el PDF.');
+    }
+
+    document.body.classList.add('pdf-generating');
+
+    try {
+        await waitForInvoiceImages(element);
+        await waitForPdfLayout();
+
+        const PdfConstructor = getPdfConstructor();
+
+        if (!PdfConstructor || typeof html2canvas !== 'function') {
+            if (allowDownloadFallback && typeof html2pdf === 'function') {
+                await html2pdf().set(getHtml2PdfOptions()).from(element).save();
+                return null;
+            }
+
+            throw new Error('El navegador no pudo cargar las librerías para compartir el PDF.');
+        }
+
+        const canvas = await html2canvas(element, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            windowWidth: Math.max(1200, element.scrollWidth),
+            scrollX: 0,
+            scrollY: -window.scrollY
+        });
+
+        const pdf = new PdfConstructor({
+            orientation: 'portrait',
+            unit: 'cm',
+            format: 'a4',
+            compress: true
+        });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 0.35;
+        const maxWidth = pageWidth - (margin * 2);
+        const maxHeight = pageHeight - (margin * 2);
+        let imageWidth = maxWidth;
+        let imageHeight = (canvas.height * imageWidth) / canvas.width;
+
+        if (imageHeight > maxHeight) {
+            imageHeight = maxHeight;
+            imageWidth = (canvas.width * imageHeight) / canvas.height;
+        }
+
+        const imageX = (pageWidth - imageWidth) / 2;
+        const imageY = margin;
+        const imageData = canvas.toDataURL('image/jpeg', 0.98);
+
+        pdf.addImage(imageData, 'JPEG', imageX, imageY, imageWidth, imageHeight, undefined, 'FAST');
+        return pdf;
+    } finally {
+        document.body.classList.remove('pdf-generating');
+    }
+}
+
+async function crearArchivoPdfRecibo() {
+    if (typeof File !== 'function') {
+        throw new Error('file-share-not-supported');
+    }
+
+    const pdf = await crearPdfRecibo(false);
+    const pdfBlob = pdf.output('blob');
+
+    return new File([pdfBlob], reciboPdfFilename, { type: 'application/pdf' });
+}
+
+function puedeCompartirArchivo(file) {
+    if (!navigator.share) {
+        return false;
+    }
+
+    if (navigator.canShare) {
+        return navigator.canShare({ files: [file] });
+    }
+
+    return true;
+}
+
+async function compartirArchivoRecibo(file) {
+    if (!puedeCompartirArchivo(file)) {
+        throw new Error('file-share-not-supported');
+    }
+
+    await navigator.share({
+        title: reciboShareTitle,
+        text: reciboShareText,
+        files: [file]
+    });
+}
+
+function normalizarTelefonoWhatsApp(phone) {
+    const digits = String(phone || '').replace(/\D/g, '');
+
+    if (digits.length === 8) {
+        return `504${digits}`;
+    }
+
+    return digits;
+}
+
+function abrirWhatsAppConTexto() {
+    const phone = normalizarTelefonoWhatsApp(clienteWhatsAppTelefono);
+    const message = `${reciboShareText}\n\nRecibo: ${reciboPdfFilename}`;
+    const url = phone
+        ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+        : `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+    window.open(url, '_blank');
+}
+
+async function pedirSegundoToqueParaCompartir(file) {
+    const result = await Swal.fire({
+        icon: 'info',
+        title: 'PDF listo',
+        text: 'Toca Compartir ahora y elige WhatsApp para enviarlo como adjunto.',
+        showCancelButton: true,
+        confirmButtonText: 'Compartir ahora',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            await compartirArchivoRecibo(file);
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                throw error;
+            }
+        }
+    }
+}
+
+async function generarPDF() {
+    setPdfButtonsDisabled(true);
+
+    try {
+        const pdf = await crearPdfRecibo(true);
+
+        if (pdf) {
+            pdf.save(reciboPdfFilename);
+        }
+    } catch (error) {
+        console.error('Error al generar PDF:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudo generar el PDF. Inténtalo de nuevo.'
+        });
+    } finally {
+        setPdfButtonsDisabled(false);
+    }
+}
+
+async function enviarPDFWhatsApp() {
+    setPdfButtonsDisabled(true);
+
+    try {
+        const pdfFile = await crearArchivoPdfRecibo();
+
+        try {
+            await compartirArchivoRecibo(pdfFile);
+        } catch (shareError) {
+            if (shareError.name === 'AbortError') {
+                return;
+            }
+
+            if (shareError.name === 'NotAllowedError') {
+                await pedirSegundoToqueParaCompartir(pdfFile);
+                return;
+            }
+
+            throw shareError;
+        }
+    } catch (error) {
+        console.error('Error al compartir PDF:', error);
+
+        if (error.name === 'AbortError') {
+            return;
+        }
+
+        if (error.message === 'file-share-not-supported' || error.name === 'TypeError') {
+            const result = await Swal.fire({
+                icon: 'info',
+                title: 'Compartir PDF no disponible',
+                text: 'Este navegador no permite adjuntar el PDF directo. Puedo abrir WhatsApp con el mensaje para el cliente.',
+                showCancelButton: true,
+                confirmButtonText: 'Abrir WhatsApp',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (result.isConfirmed) {
+                abrirWhatsAppConTexto();
+            }
+
+            return;
+        }
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudo preparar el recibo para WhatsApp. Inténtalo de nuevo.'
+        });
+    } finally {
+        setPdfButtonsDisabled(false);
+    }
+}
+
+// Add data labels for responsive tables
+document.addEventListener('DOMContentLoaded', function() {
+    const items = document.querySelectorAll('.invoice-items tbody td');
+    const labels = ['Descripción', 'Unidades', 'Precio Unitario', 'Total'];
+    
+    items.forEach((td, index) => {
+        td.setAttribute('data-label', labels[index % labels.length]);
+    });
+});
+
+// LÓGICA PARA REGISTRAR PAGO
+async function registrarPago() {
+    const facturaId = <%= factura.id %>;
+    const { value: formValues } = await Swal.fire({
+        title: 'Registrar Pago',
+        html: `
+            <div class="alert alert-light border text-start py-2">
+                <div><strong>Saldo pendiente:</strong> L ${saldoFacturaActual.toFixed(2)}</div>
+                <small class="text-muted">Si recibe más del saldo, el excedente queda como abono para próximas facturas.</small>
+            </div>
+            <div class="mb-3 text-start">
+                <label class="form-label">Monto recibido</label>
+                <input id="montoRecibido" type="number" min="0.01" step="0.01" class="form-control" value="${saldoFacturaActual.toFixed(2)}">
+            </div>
+            <div class="mb-3 text-start">
+                <label class="form-label">Método de Pago</label>
+                <select id="metodoPago" class="form-select">
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                </select>
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Registrar',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+            const montoRecibido = parseFloat(document.getElementById('montoRecibido').value);
+
+            if (!Number.isFinite(montoRecibido) || montoRecibido <= 0) {
+                Swal.showValidationMessage('Ingrese un monto recibido mayor a cero');
+                return false;
+            }
+
+            return {
+                metodo_pago: document.getElementById('metodoPago').value,
+                monto_recibido: montoRecibido
+            }
+        }
+    });
+
+    if (formValues) {
+        try {
+            const response = await fetch(`/facturacion/${facturaId}/pago`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': '<%= csrfToken %>'
+                },
+                body: JSON.stringify(formValues)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const abono = Number(result.data?.abono_generado || 0);
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Éxito!',
+                    text: abono > 0
+                        ? `Pago registrado. Abono a favor: L ${abono.toFixed(2)}`
+                        : 'Pago registrado correctamente',
+                    showConfirmButton: false,
+                    timer: 2200
+                }).then(() => {
+                    location.reload();
+                });
+            } else {
+                throw new Error(result.error || 'Error al registrar el pago');
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message || 'No se pudo registrar el pago'
+            });
+        }
+    }
+}
+</script>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,145 @@
+<%- include('../partials/header') %>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Nuevo Cliente</h1>
+        <a href="/clientes" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <form id="nuevoClienteForm">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="nombre" class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="nombre" name="nombre" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="apellido" class="form-label">Apellido</label>
+                                <input type="text" class="form-control" id="apellido" name="apellido" required>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="dni" class="form-label">DNI</label>
+                                <input type="text" class="form-control" id="dni" name="dni" required 
+                                       pattern="\d{13}" 
+                                       maxlength="13"
+                                       title="DNI debe tener 13 dígitos numéricos">
+                                <div class="form-text">Formato: 13 dígitos numéricos (ejemplo: 1601199800012)</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" name="email">
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="telefono" class="form-label">Teléfono</label>
+                                <input type="tel" class="form-control" id="telefono" name="telefono">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="plan_id" class="form-label">Plan</label>
+                                <select class="form-select" id="plan_id" name="plan_id" required>
+                                    <option value="">Seleccione un plan</option>
+                                    <% planes.forEach(function(plan) { %>
+                                        <option value="<%= plan.id %>">
+                                            <%= plan.nombre %> - ↓<%= plan.velocidad_descarga %>Mbps ↑<%= plan.velocidad_subida %>Mbps - $<%= plan.precio %>
+                                        </option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="direccion" class="form-label">Dirección</label>
+                            <textarea class="form-control" id="direccion" name="direccion" rows="2"></textarea>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Guardar Cliente
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('nuevoClienteForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    try {
+        const formData = {
+            nombre: document.getElementById('nombre').value,
+            apellido: document.getElementById('apellido').value,
+            dni: document.getElementById('dni').value,
+            email: document.getElementById('email').value,
+            telefono: document.getElementById('telefono').value,
+            direccion: document.getElementById('direccion').value,
+            plan_id: document.getElementById('plan_id').value,
+            _csrf: document.querySelector('input[name="_csrf"]').value
+        };
+
+        const response = await fetch('/clientes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'CSRF-Token': formData._csrf
+            },
+            body: JSON.stringify(formData)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error al crear el cliente');
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            await Swal.fire({
+                icon: 'success',
+                title: 'Éxito',
+                text: 'Cliente creado correctamente',
+                showConfirmButton: false,
+                timer: 1500
+            });
+            window.location.href = '/clientes';
+        } else {
+            throw new Error(result.error || 'Error al crear el cliente');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: error.message || 'No se pudo crear el cliente'
+        });
+    }
+});
+
+// Formatear DNI automáticamente
+document.getElementById('dni').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/[^0-9]/g, '');
+    
+    // Limitar a 13 dígitos
+    if (value.length > 13) {
+        value = value.slice(0, 13);
+    }
+    
+    e.target.value = value;
+});
+</script>
+
+<%- include('../partials/footer') %> 

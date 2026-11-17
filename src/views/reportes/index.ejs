@@ -1,0 +1,142 @@
+<%- include('../partials/header') %>
+
+<style>
+    /* Estilos para una tabla más compacta */
+    #reportesTable {
+        font-size: 0.9rem;
+    }
+    #reportesTable td,
+    #reportesTable th {
+        padding: 0.5rem;
+        vertical-align: middle;
+    }
+    .badge {
+        font-size: 0.8em;
+    }
+    .actions-cell .btn-sm {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.8rem;
+    }
+</style>
+
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Gestión de Reportes</h1>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <!-- Filtros -->
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="filtroEstadoReporte" class="form-label">Filtrar por Estado</label>
+                    <select id="filtroEstadoReporte" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="Nuevo">Nuevos</option>
+                        <option value="En revisión">En revisión</option>
+                        <option value="Asignado">Asignados</option>
+                        <option value="Resuelto">Resueltos</option>
+                        <option value="Cerrado">Cerrados</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="filtroTipoReporte" class="form-label">Filtrar por Tipo</label>
+                    <select id="filtroTipoReporte" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="Fallo de servicio">Fallo de servicio</option>
+                        <option value="Cable dañado">Cable dañado</option>
+                        <option value="Poste caído">Poste caído</option>
+                        <option value="Problema de facturación">Problema de facturación</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table id="reportesTable" class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Cliente</th>
+                            <th>Tipo de Reporte</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Los datos se cargarán dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    const table = $('#reportesTable').DataTable({
+        ajax: {
+            url: '/reportes/list',
+            dataSrc: ''
+        },
+        columns: [
+            { data: 'id' },
+            { 
+                data: null,
+                render: function(data) {
+                    return `<a href="/clientes/${data.cliente_id}">${data.cliente_nombre} ${data.cliente_apellido}</a>`;
+                }
+            },
+            { data: 'tipo_reporte' },
+            { 
+                data: 'created_at',
+                render: function(data) {
+                    return new Date(data).toLocaleString('es-HN');
+                }
+            },
+            {
+                data: 'estado',
+                render: function(data) {
+                    let badgeClass = '';
+                    switch(data) {
+                        case 'Nuevo': badgeClass = 'bg-primary'; break;
+                        case 'En revisión': badgeClass = 'bg-info'; break;
+                        case 'Asignado': badgeClass = 'bg-warning text-dark'; break;
+                        case 'Resuelto': badgeClass = 'bg-success'; break;
+                        case 'Cerrado': badgeClass = 'bg-secondary'; break;
+                        default: badgeClass = 'bg-light text-dark';
+                    }
+                    return `<span class="badge ${badgeClass}">${data}</span>`;
+                }
+            },
+            {
+                data: null,
+                orderable: false,
+                className: 'actions-cell',
+                render: function(data) {
+                    return `
+                        <a href="/tickets/${data.id}" class="btn btn-sm btn-info" title="Ver Detalles">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    `;
+                }
+            }
+        ],
+        order: [[0, 'desc']],
+        language: { url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json' },
+        responsive: true
+    });
+
+    // Aplicar filtros de los selects
+    $('#filtroEstadoReporte, #filtroTipoReporte').on('change', function () {
+        const estado = $('#filtroEstadoReporte').val();
+        const tipo = $('#filtroTipoReporte').val();
+        
+        // Columna 4 es 'Estado', Columna 2 es 'Tipo'
+        table.column(4).search(estado).column(2).search(tipo).draw();
+    });
+});
+</script>
+
+<%- include('../partials/footer') %>
