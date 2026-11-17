@@ -1,11 +1,40 @@
-# Práctica 5: Configuración del sistema
+# Práctica 5: Clínica de código completa
 
 **Proyecto:** ISPAdmin, sistema de administración para un proveedor de internet
 **Autor:** jpinedacastell
 **Fecha:** 17 de noviembre de 2026
-**Versión:** `v1.3.0` (más `v1.4.0` con el ajuste del logo)
 
 ---
+
+## Contenido de la carpeta
+
+| Archivo | Qué es |
+|---|---|
+| [enfermo.js](enfermo.js) | La lógica de clientes como estaba antes: `if` anidados, `switch`, números mágicos y nombres sin significado. |
+| [sano.js](sano.js) | El mismo comportamiento con Clean Code y SOLID aplicados. |
+| [tests/clinica.test.js](tests/clinica.test.js) | Pruebas que corren los mismos casos contra los dos archivos. |
+| [diagnostico.md](diagnostico.md) | Cada síntoma encontrado, su tratamiento y las líneas exactas en los dos archivos. |
+
+Para correr las pruebas, desde la raíz del repo:
+
+```bash
+npm run test:practica5
+```
+
+Resultado: 53 pruebas, 0 fallos.
+
+Temas cubiertos: elegancia del operador ternario, tipado fuerte, números
+mágicos, complejidad condicional, polimorfismo vs enum, ser declarativo,
+método de tabla y los cinco principios SOLID. El detalle está en
+[diagnostico.md](diagnostico.md).
+
+---
+
+# Aplicación en el proyecto: configuración del sistema
+
+**Versión:** `v1.3.0` (más `v1.4.0` con el ajuste del logo)
+
+Las mismas técnicas se usaron en una funcionalidad real de ISPAdmin.
 
 ## Objetivo
 
