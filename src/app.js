@@ -36,6 +36,7 @@ const userRoutes = require('./routes/userRoutes');
 
 const { verifyToken } = require('./middleware/auth');
 const { cargarConfiguracionSistema } = require('./middleware/configuracionSistema');
+const { CONFIG_POR_DEFECTO } = require('./domain/configuracion/configuracionSistema');
 
 // Crear aplicación Express
 const app = express();
@@ -43,6 +44,9 @@ const app = express();
 // Configurar EJS como motor de vistas
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+
+// Respaldo para vistas que se rendericen antes del middleware (p. ej. errores de CSRF)
+app.locals.sistema = CONFIG_POR_DEFECTO;
 
 // Middleware básico
 app.use(cors());
