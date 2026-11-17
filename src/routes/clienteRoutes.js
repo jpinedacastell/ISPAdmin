@@ -3,6 +3,12 @@ const router = express.Router();
 const { verifyToken } = require('../middleware/auth');
 const db = require('../config/database');
 const facturacionService = require('../services/facturacionService');
+const { HTTP_STATUS } = require('../constants/http');
+const { conTransaccion } = require('../database/conTransaccion');
+const { ClienteId, ClienteIdInvalidoError } = require('../domain/clientes/ClienteId');
+const { TIPO_RESULTADO } = require('../domain/clientes/ResultadoEliminacion');
+const { ClienteRepository } = require('../repositories/ClienteRepository');
+const { EliminarClienteService } = require('../services/clientes/EliminarClienteService');
 
 // Ruta para listar clientes
 router.get('/', verifyToken, async (req, res) => {
@@ -493,14 +499,58 @@ router.patch('/:id/toggle', verifyToken, async (req, res) => {
 });
 
 // API para eliminar cliente
+const MYSQL_FK_VIOLATION = 'ER_ROW_IS_REFERENCED_2';
+
+const listar = (conteos) => conteos.map(({ cantidad, descripcion }) => `${cantidad} ${descripcion}`).join(', ');
+
+// Respuesta HTTP según el resultado de la eliminación
+const RESPUESTA_ELIMINACION = Object.freeze({
+    [TIPO_RESULTADO.ELIMINADO]: (resultado) => ({
+        status: HTTP_STATUS.OK,
+        body: {
+            success: true,
+            message: resultado.detalle.length > 0
+                ? `Cliente eliminado junto con: ${listar(resultado.detalle)}`
+                : 'Cliente eliminado correctamente'
+        }
+    }),
+    [TIPO_RESULTADO.NO_ENCONTRADO]: () => ({
+        status: HTTP_STATUS.NOT_FOUND,
+        body: { success: false, error: 'Cliente no encontrado' }
+    }),
+    [TIPO_RESULTADO.BLOQUEADO]: (resultado) => ({
+        status: HTTP_STATUS.CONFLICT,
+        body: {
+            success: false,
+            error: `No se puede eliminar: el cliente tiene ${listar(resultado.detalle)}. Desactívelo en su lugar.`,
+            bloqueos: resultado.detalle
+        }
+    })
+});
+
 router.delete('/:id', verifyToken, async (req, res) => {
     try {
-        const { id } = req.params;
-        await db.query('DELETE FROM clientes WHERE id = ?', [id]);
-        res.json({ success: true });
+        const clienteId = new ClienteId(req.params.id);
+
+        const resultado = await conTransaccion(db, (conexion) =>
+            new EliminarClienteService({ clienteRepository: new ClienteRepository(conexion) }).ejecutar(clienteId)
+        );
+
+        const { status, body } = RESPUESTA_ELIMINACION[resultado.tipo](resultado);
+        res.status(status).json(body);
     } catch (error) {
+        if (error instanceof ClienteIdInvalidoError) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ success: false, error: error.message });
+        }
+        // Por si se creó una factura entre el conteo y el DELETE
+        if (error.code === MYSQL_FK_VIOLATION) {
+            return res.status(HTTP_STATUS.CONFLICT).json({
+                success: false,
+                error: 'No se puede eliminar: el cliente tiene registros asociados. Desactívelo en su lugar.'
+            });
+        }
         console.error('Error al eliminar cliente:', error);
-        res.status(500).json({ error: 'Error al eliminar cliente' });
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ success: false, error: 'Error al eliminar cliente' });
     }
 });
 
