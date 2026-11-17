@@ -29,9 +29,9 @@
 <div class="container-fluid px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Gestión de Clientes</h1>
-        <a href="/clientes/nuevo" class="btn btn-primary">
+        <button type="button" class="btn btn-primary" id="btnNuevoCliente">
             <i class="fas fa-plus"></i> Nuevo Cliente
-        </a>
+        </button>
     </div>
 
     <div class="card">
@@ -71,6 +71,68 @@
     </div>
 </div>
 
+<!-- Modal de Nuevo Cliente -->
+<div class="modal fade" id="nuevoClienteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="nuevoClienteForm" novalidate>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="nuevoNombre" class="form-label">Nombre</label>
+                            <input type="text" class="form-control" id="nuevoNombre" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="nuevoApellido" class="form-label">Apellido</label>
+                            <input type="text" class="form-control" id="nuevoApellido" required>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="nuevoDni" class="form-label">DNI <small class="text-muted">(opcional)</small></label>
+                            <input type="text" class="form-control" id="nuevoDni"
+                                   pattern="\d{13}"
+                                   maxlength="13"
+                                   title="DNI debe tener 13 dígitos numéricos">
+                            <div class="form-text">13 dígitos numéricos</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="nuevoEmail" class="form-label">Email <small class="text-muted">(opcional)</small></label>
+                            <input type="email" class="form-control" id="nuevoEmail">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="nuevoTelefono" class="form-label">Teléfono</label>
+                            <input type="tel" class="form-control" id="nuevoTelefono">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="nuevoPlan" class="form-label">Plan</label>
+                            <select class="form-select" id="nuevoPlan" required>
+                                <option value="">Seleccione un plan</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nuevoDireccion" class="form-label">Dirección</label>
+                        <textarea class="form-control" id="nuevoDireccion" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="guardarNuevoCliente">
+                    <i class="fas fa-save"></i> Guardar Cliente
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal de Edición -->
 <div class="modal fade" id="editarClienteModal" tabindex="-1">
     <div class="modal-dialog">
@@ -94,8 +156,8 @@
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="editDni" class="form-label">DNI</label>
-                            <input type="text" class="form-control" id="editDni" required
+                            <label for="editDni" class="form-label">DNI <small class="text-muted">(opcional)</small></label>
+                            <input type="text" class="form-control" id="editDni"
                                    pattern="\d{13}"
                                    maxlength="13"
                                    title="DNI debe tener 13 dígitos numéricos">
@@ -246,13 +308,13 @@ $(document).ready(function() {
     });
 
     // Cargar planes en el select
-    async function cargarPlanes() {
+    async function cargarPlanes(selectId = 'editPlan', textoVacio = 'Sin plan') {
         try {
             const response = await fetch('/planes/list');
             const planes = await response.json();
-            
-            const planSelect = document.getElementById('editPlan');
-            planSelect.innerHTML = '<option value="">Sin plan</option>';
+
+            const planSelect = document.getElementById(selectId);
+            planSelect.innerHTML = `<option value="">${textoVacio}</option>`;
             
             planes.filter(plan => plan.activo).forEach(plan => {
                 const option = document.createElement('option');
@@ -354,6 +416,71 @@ $(document).ready(function() {
     $('#clientesTable').on('click', '.eliminar-cliente', function() {
         const { clienteId, clienteNombre } = $(this).data();
         ClientesUI.eliminarCliente(clienteId, clienteNombre, () => table.ajax.reload(null, false));
+    });
+
+    // Nuevo cliente
+    const CAMPOS_NUEVO_CLIENTE = {
+        nombre: 'nuevoNombre',
+        apellido: 'nuevoApellido',
+        dni: 'nuevoDni',
+        email: 'nuevoEmail',
+        telefono: 'nuevoTelefono',
+        direccion: 'nuevoDireccion',
+        plan_id: 'nuevoPlan'
+    };
+    const modalNuevoCliente = new bootstrap.Modal(document.getElementById('nuevoClienteModal'));
+
+    $('#btnNuevoCliente').on('click', async function() {
+        document.getElementById('nuevoClienteForm').reset();
+        await cargarPlanes('nuevoPlan', 'Seleccione un plan');
+        modalNuevoCliente.show();
+    });
+
+    $('#guardarNuevoCliente').on('click', async function() {
+        const form = document.getElementById('nuevoClienteForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const datos = Object.fromEntries(
+            Object.entries(CAMPOS_NUEVO_CLIENTE).map(([campo, id]) => [campo, document.getElementById(id).value.trim()])
+        );
+
+        try {
+            const response = await fetch('/clientes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': '<%= csrfToken %>'
+                },
+                body: JSON.stringify(datos)
+            });
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Error al crear el cliente');
+            }
+
+            modalNuevoCliente.hide();
+            table.ajax.reload(null, false);
+            Swal.fire({
+                icon: 'success',
+                title: 'Éxito',
+                text: 'Cliente creado correctamente',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: ClientesUI.DURACION_TOAST_MS
+            });
+        } catch (error) {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.message || 'No se pudo crear el cliente'
+            });
+        }
     });
 
     // Manejar guardado de cambios

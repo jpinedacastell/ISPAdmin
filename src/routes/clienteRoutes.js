@@ -6,6 +6,7 @@ const facturacionService = require('../services/facturacionService');
 const { HTTP_STATUS } = require('../constants/http');
 const { conTransaccion } = require('../database/conTransaccion');
 const { ClienteId, ClienteIdInvalidoError } = require('../domain/clientes/ClienteId');
+const { normalizarDatosCliente, validarDatosCliente } = require('../domain/clientes/datosCliente');
 const { TIPO_RESULTADO } = require('../domain/clientes/ResultadoEliminacion');
 const { ClienteRepository } = require('../repositories/ClienteRepository');
 const { EliminarClienteService } = require('../services/clientes/EliminarClienteService');
@@ -238,46 +239,30 @@ router.get('/:id', verifyToken, async (req, res) => {
 router.post('/', verifyToken, async (req, res) => {
     let connection;
     try {
-        const {
-            nombre,
-            apellido,
-            dni,
-            email,
-            telefono,
-            direccion,
-            plan_id
-        } = req.body;
+        const datos = normalizarDatosCliente(req.body);
 
-        // Validaciones
-        if (!nombre || !apellido || !dni || !plan_id) {
-            return res.status(400).json({ error: 'Nombre, apellido, DNI y plan son obligatorios.' });
-        }
-
-        // Validar DNI
-        if (!dni.match(/^\d{13}$/)) {
-            return res.status(400).json({ error: 'El DNI debe tener 13 dígitos numéricos' });
+        const error = validarDatosCliente(datos, { requierePlan: true });
+        if (error) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ success: false, error });
         }
 
         connection = await db.getConnection();
         await connection.beginTransaction();
 
-        // Verificar si el DNI ya existe
-        const [existingClients] = await connection.query('SELECT id FROM clientes WHERE dni = ?', [dni]);
-        if (existingClients.length > 0) {
+        const duplicado = await new ClienteRepository(connection).buscarDuplicado(datos);
+        if (duplicado) {
             await connection.rollback();
-            return res.status(400).json({ error: 'Ya existe un cliente con este DNI' });
+            return res.status(HTTP_STATUS.CONFLICT).json({ success: false, error: duplicado });
         }
 
-        // Insertar cliente
         const [result] = await connection.query(
             'INSERT INTO clientes (nombre, apellido, dni, email, telefono, direccion) VALUES (?, ?, ?, ?, ?, ?)',
-            [nombre, apellido, dni, email, telefono || null, direccion || null]
+            [datos.nombre, datos.apellido, datos.dni, datos.email, datos.telefono, datos.direccion]
         );
 
-        // Asociar plan al cliente
         await connection.query(
             'INSERT INTO cliente_plan (cliente_id, plan_id, fecha_inicio, activo) VALUES (?, ?, NOW(), true)',
-            [result.insertId, plan_id]
+            [result.insertId, datos.plan_id]
         );
 
         await connection.commit();
@@ -288,7 +273,7 @@ router.post('/', verifyToken, async (req, res) => {
             await connection.rollback();
         }
         console.error('Error al crear cliente:', error);
-        res.status(500).json({ error: 'Error al crear el cliente' });
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ success: false, error: 'Error al crear el cliente' });
     } finally {
         if (connection) {
             connection.release();
@@ -301,39 +286,22 @@ router.put('/:id', verifyToken, async (req, res) => {
     let connection;
     try {
         const { id } = req.params;
-        const { nombre, apellido, dni, email, telefono, direccion, plan_id } = req.body;
+        const { plan_id } = req.body;
+        const datos = normalizarDatosCliente(req.body);
 
-        // Validaciones básicas
-        if (!nombre || !apellido || !dni || !email) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Los campos nombre, apellido, DNI y email son obligatorios' 
-            });
-        }
-
-        // Validar formato de DNI
-        if (!dni.match(/^\d{13}$/)) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'El DNI debe tener 13 dígitos numéricos' 
-            });
+        const errorValidacion = validarDatosCliente(datos, { requierePlan: false });
+        if (errorValidacion) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ success: false, error: errorValidacion });
         }
 
         connection = await db.getConnection();
         await connection.beginTransaction();
 
         try {
-            // Verificar si el DNI ya existe en otro cliente
-            const [existingDni] = await connection.query(
-                'SELECT id FROM clientes WHERE dni = ? AND id != ?',
-                [dni.toUpperCase(), id]
-            );
-
-            if (existingDni.length > 0) {
-                return res.status(400).json({ 
-                    success: false,
-                    error: 'El DNI ya está registrado para otro cliente' 
-                });
+            const duplicado = await new ClienteRepository(connection).buscarDuplicado(datos, Number(id));
+            if (duplicado) {
+                await connection.rollback();
+                return res.status(HTTP_STATUS.CONFLICT).json({ success: false, error: duplicado });
             }
 
             // Actualizar datos del cliente
@@ -346,7 +314,7 @@ router.put('/:id', verifyToken, async (req, res) => {
                      telefono = ?, 
                      direccion = ?
                  WHERE id = ?`,
-                [nombre, apellido, dni.toUpperCase(), email, telefono || null, direccion || null, id]
+                [datos.nombre, datos.apellido, datos.dni, datos.email, datos.telefono, datos.direccion, id]
             );
 
             // Manejar actualización del plan
