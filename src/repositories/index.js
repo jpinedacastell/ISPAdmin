@@ -9,6 +9,7 @@ const { MovimientoFinancieroRepository } = require('./MovimientoFinancieroReposi
 const { ContabilidadRepository } = require('./ContabilidadRepository');
 const { ReporteRepository } = require('./ReporteRepository');
 const { AdminRepository } = require('./AdminRepository');
+const { DashboardRepository } = require('./DashboardRepository');
 
 const crearRepositorios = (conexion) => ({
     clientes: new ClienteRepository(conexion),
@@ -17,7 +18,8 @@ const crearRepositorios = (conexion) => ({
     movimientos: new MovimientoFinancieroRepository(conexion),
     contabilidad: new ContabilidadRepository(conexion),
     reportes: new ReporteRepository(conexion),
-    admins: new AdminRepository(conexion)
+    admins: new AdminRepository(conexion),
+    dashboard: new DashboardRepository(conexion)
 });
 
 /**
