@@ -1,0 +1,19 @@
+name: Arquitectura
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check-db:
+    name: Solo los repositorios usan la base de datos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # No necesita instalar dependencias ni conectarse a la BD
+      - run: node src/scripts/check-db.js
+      - run: node --test practica-5/tests/
