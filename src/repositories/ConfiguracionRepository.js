@@ -1,5 +1,7 @@
 // @ts-check
 
+const db = require('../config/database');
+
 const CONFIG_ID = 1;
 
 /**
@@ -73,4 +75,7 @@ class ConfiguracionRepository {
     }
 }
 
-module.exports = { ConfiguracionRepository };
+module.exports = {
+    ConfiguracionRepository,
+    configuracionRepository: new ConfiguracionRepository(db)
+};
