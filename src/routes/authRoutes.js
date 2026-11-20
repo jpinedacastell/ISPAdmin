@@ -2,10 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const { verifyToken, checkNotAuthenticated } = require('../middleware/auth');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const db = require('../config/database');
-const authController = require('../controllers/authController'); // Esta línea importa el archivo que acabas de crear.
+const authController = require('../controllers/authController');
+const authService = require('../services/auth');
+const { RESULTADO_PASSWORD } = require('../services/auth/AuthService');
 
 // Validaciones
 const validarLogin = [
@@ -28,22 +27,8 @@ router.post('/login', validarLogin, async (req, res) => {
     try {
         const { usuario, password } = req.body;
 
-        // Buscar usuario en la base de datos
-        const [usuarios] = await db.query('SELECT * FROM administradores WHERE usuario = ?', [usuario]);
-
-        if (usuarios.length === 0) {
-            return res.status(401).json({
-                success: false,
-                error: 'Usuario o contraseña incorrectos'
-            });
-        }
-
-        const user = usuarios[0];
-
-        // Verificar contraseña con bcrypt
-        const validPassword = await bcrypt.compare(password, user.password);
-
-        if (!validPassword) {
+        const admin = await authService.autenticar(usuario, password);
+        if (!admin) {
             return res.status(401).json({
                 success: false,
                 error: 'Usuario o contraseña incorrectos'
@@ -51,12 +36,7 @@ router.post('/login', validarLogin, async (req, res) => {
         }
 
         // Guardar usuario en sesión
-        req.session.user = {
-            id: user.id,
-            usuario: user.usuario,
-            nombre: user.nombre,
-            email: user.email
-        };
+        req.session.user = admin;
 
         // Asegurarse de que la sesión se guarde antes de responder
         req.session.save((err) => {
@@ -86,11 +66,11 @@ router.post('/login', validarLogin, async (req, res) => {
 // Ruta para obtener perfil
 router.get('/perfil', verifyToken, async (req, res) => {
     try {
-        const [user] = await db.query('SELECT id, usuario, nombre FROM administradores WHERE id = ?', [req.user.id]);
-        if (user.length === 0) {
+        const perfil = await authService.perfilBasico(req.user.id);
+        if (!perfil) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
-        res.json(user[0]);
+        res.json(perfil);
     } catch (error) {
         console.error('Error al obtener perfil:', error);
         res.status(500).json({ error: 'Error al obtener perfil' });
@@ -102,20 +82,15 @@ router.post('/cambiar-password', verifyToken, validarCambioPassword, async (req,
     try {
         const { passwordActual, passwordNuevo } = req.body;
         
-        // Verificar contraseña actual
-        const [user] = await db.query('SELECT password FROM administradores WHERE id = ?', [req.user.id]);
-        const validPassword = await bcrypt.compare(passwordActual, user[0].password);
-        
-        if (!validPassword) {
+        const resultado = await authService.verificarPassword(req.user.id, passwordActual);
+        if (resultado === RESULTADO_PASSWORD.USUARIO_NO_ENCONTRADO) {
+            throw new Error('Usuario no encontrado');
+        }
+        if (resultado === RESULTADO_PASSWORD.INCORRECTA) {
             return res.status(401).json({ error: 'Contraseña actual incorrecta' });
         }
 
-        // Encriptar nueva contraseña
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(passwordNuevo, salt);
-
-        // Actualizar contraseña
-        await db.query('UPDATE administradores SET password = ? WHERE id = ?', [hashedPassword, req.user.id]);
+        await authService.cambiarPassword(req.user.id, passwordNuevo);
 
         res.json({ message: 'Contraseña actualizada exitosamente' });
     } catch (error) {
@@ -141,13 +116,7 @@ router.get('/logout', (req, res) => {
 // Ruta temporal para crear admin (eliminar en producción)
 router.get('/setup', async (req, res) => {
     try {
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash('admin123', salt);
-        
-        await db.query(`
-            INSERT INTO administradores (usuario, password, nombre) 
-            VALUES (?, ?, ?)
-        `, ['admin', hashedPassword, 'Administrador']);
+        await authService.crearAdminInicial();
         
         res.send('Administrador creado exitosamente');
     } catch (error) {
