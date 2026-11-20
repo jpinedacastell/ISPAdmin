@@ -1,8 +1,8 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
 const router = express.Router();
 const { verifyToken } = require('../middleware/auth');
-const db = require('../config/database');
+const authService = require('../services/auth');
+const { RESULTADO_PASSWORD } = require('../services/auth/AuthService');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
@@ -22,12 +22,9 @@ const {
 router.get('/perfil', verifyToken, async (req, res) => {
     try {
         const userId = req.session.user?.id;
-        const [rows] = await db.query(
-            'SELECT id, usuario, nombre, email, created_at FROM administradores WHERE id = ?',
-            [userId]
-        );
+        const perfil = await authService.perfil(userId);
 
-        if (!rows.length) {
+        if (!perfil) {
             req.flash('error_msg', 'Usuario no encontrado.');
             return res.redirect('/dashboard');
         }
@@ -35,7 +32,7 @@ router.get('/perfil', verifyToken, async (req, res) => {
         res.render('user/perfil', {
             title: 'Perfil',
             currentPage: '',
-            perfil: rows[0],
+            perfil,
             user: req.session.user
         });
     } catch (error) {
@@ -171,20 +168,17 @@ router.post('/configuracion/password', verifyToken, async (req, res) => {
             return res.redirect('/configuracion?tab=seguridad');
         }
 
-        const [rows] = await db.query('SELECT password FROM administradores WHERE id = ?', [userId]);
-        if (!rows.length) {
+        const resultado = await authService.verificarPassword(userId, passwordActual);
+        if (resultado === RESULTADO_PASSWORD.USUARIO_NO_ENCONTRADO) {
             req.flash('error_msg', 'Usuario no encontrado.');
             return res.redirect('/configuracion?tab=seguridad');
         }
-
-        const passwordOk = await bcrypt.compare(passwordActual, rows[0].password);
-        if (!passwordOk) {
+        if (resultado === RESULTADO_PASSWORD.INCORRECTA) {
             req.flash('error_msg', 'La contraseña actual es incorrecta.');
             return res.redirect('/configuracion?tab=seguridad');
         }
 
-        const hashed = await bcrypt.hash(passwordNuevo, 10);
-        await db.query('UPDATE administradores SET password = ? WHERE id = ?', [hashed, userId]);
+        await authService.cambiarPassword(userId, passwordNuevo);
         req.flash('success_msg', 'Contraseña actualizada correctamente.');
         res.redirect('/configuracion?tab=seguridad');
     } catch (error) {

@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/auth');
-const db = require('../config/database');
+const pagoService = require('../services/pagos');
 
 // GET /pagos - Muestra la vista principal
 router.get('/', verifyToken, (req, res) => {
@@ -17,8 +17,7 @@ router.get('/', verifyToken, (req, res) => {
 // GET /pagos/list - API para listar todos los pagos para DataTables
 router.get('/list', verifyToken, async (req, res) => {
     try {
-        const [pagos] = await db.query('SELECT * FROM pagos ORDER BY fecha_pago DESC');
-        res.json(pagos);
+        res.json(await pagoService.listar());
     } catch (error) {
         console.error('Error al listar pagos:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
@@ -28,22 +27,7 @@ router.get('/list', verifyToken, async (req, res) => {
 // POST /pagos - Crear un nuevo pago
 router.post('/', verifyToken, async (req, res) => {
     try {
-        const { descripcion, monto, fecha_pago, categoria, referencia } = req.body;
-        
-        await db.query(
-            `INSERT INTO movimientos_financieros 
-                (tipo, monto, descripcion, fecha, categoria, usuario_id, usuario_nombre) 
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [
-                'egreso',
-                monto,
-                `${descripcion} (Ref: ${referencia})`,
-                fecha_pago,
-                categoria,
-                req.session.user.id,
-                req.session.user.nombre
-            ]
-        );
+        await pagoService.registrarGasto(req.body, req.session.user);
 
         res.status(201).json({ success: true, message: 'Gasto registrado correctamente' });
     } catch (error) {
@@ -56,9 +40,7 @@ router.post('/', verifyToken, async (req, res) => {
 router.put('/:id', verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { descripcion, monto, fecha_pago, categoria, metodo_pago, referencia } = req.body;
-        const query = 'UPDATE pagos SET descripcion = ?, monto = ?, fecha_pago = ?, categoria = ?, metodo_pago = ?, referencia = ? WHERE id = ?';
-        await db.query(query, [descripcion, monto, fecha_pago, categoria, metodo_pago, referencia, id]);
+        await pagoService.actualizar(id, req.body);
         res.json({ success: true, message: 'Pago actualizado correctamente' });
     } catch (error) {
         console.error('Error al actualizar pago:', error);
@@ -70,11 +52,11 @@ router.put('/:id', verifyToken, async (req, res) => {
 router.get('/:id', verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const [rows] = await db.query('SELECT * FROM pagos WHERE id = ?', [id]);
-        if (rows.length === 0) {
+        const pago = await pagoService.obtener(id);
+        if (!pago) {
             return res.status(404).json({ error: 'Pago no encontrado' });
         }
-        res.json(rows[0]);
+        res.json(pago);
     } catch (error) {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
@@ -84,7 +66,7 @@ router.get('/:id', verifyToken, async (req, res) => {
 router.delete('/:id', verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
-        await db.query('DELETE FROM pagos WHERE id = ?', [id]);
+        await pagoService.eliminar(id);
         res.json({ success: true, message: 'Pago eliminado correctamente' });
     } catch (error) {
         console.error('Error al eliminar pago:', error);
