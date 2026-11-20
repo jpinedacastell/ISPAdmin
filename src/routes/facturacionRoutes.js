@@ -1,10 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const facturacionService = require('../services/facturacionService');
-const facturaModel = require('../models/facturaModel');
 const facturaController = require('../controllers/facturaController');
 const { verifyToken } = require('../middleware/auth');
-const db = require('../config/database'); // <--- AÑADE ESTA LÍNEA
 
 // Rutas para descuentos y prórrogas
 router.post('/descuento', verifyToken, async (req, res) => {
@@ -90,114 +88,12 @@ router.get('/list', verifyToken, async (req, res) => {
 // Resumen anual por cliente y mes (pagada/pendiente/sin factura)
 router.get('/resumen-anual', verifyToken, async (req, res) => {
     try {
-        await facturacionService.ensureAbonosSchema();
         const anioActual = new Date().getUTCFullYear();
         const anio = Number.parseInt(req.query.anio, 10) || anioActual;
         const estadoCliente = (req.query.estado_cliente || 'activos').toString().toLowerCase();
         const soloConDeuda = String(req.query.solo_con_deuda || '0') === '1';
 
-        let filtroEstadoSql = '';
-        if (estadoCliente === 'activos') {
-            filtroEstadoSql = 'AND cp.activo = 1';
-        } else if (estadoCliente === 'desactivados') {
-            filtroEstadoSql = 'AND cp.activo = 0';
-        }
-
-        const [rows] = await db.query(`
-            SELECT
-                c.id AS cliente_id,
-                c.nombre AS cliente_nombre,
-                c.apellido AS cliente_apellido,
-                c.created_at AS cliente_creado_en,
-                cp.activo AS cliente_activo,
-                MONTH(f.mes_facturado) AS mes_numero,
-                MAX(CASE WHEN f.estado = 'pagada' THEN 1 ELSE 0 END) AS pagada,
-                COUNT(f.id) AS total_facturas_mes
-            FROM clientes c
-            LEFT JOIN cliente_plan cp
-                ON cp.cliente_id = c.id
-                AND cp.fecha_fin IS NULL
-            LEFT JOIN facturas f
-                ON f.cliente_id = c.id
-                AND YEAR(f.mes_facturado) = ?
-            WHERE 1=1
-                ${filtroEstadoSql}
-            GROUP BY c.id, c.nombre, c.apellido, MONTH(f.mes_facturado)
-            ORDER BY c.nombre ASC, c.apellido ASC
-        `, [anio]);
-
-        const [deudas] = await db.query(`
-            SELECT
-                c.id AS cliente_id,
-                COALESCE(SUM(
-                    CASE
-                        WHEN f.estado IN ('pendiente', 'vencida')
-                        THEN GREATEST(
-                            (f.monto - COALESCE(f.descuento_monto, 0)) -
-                            COALESCE(f.monto_pagado, 0) -
-                            COALESCE(f.credito_aplicado, 0),
-                            0
-                        )
-                        ELSE 0
-                    END
-                ), 0) AS total_por_pagar
-            FROM clientes c
-            LEFT JOIN cliente_plan cp
-                ON cp.cliente_id = c.id
-                AND cp.fecha_fin IS NULL
-            LEFT JOIN facturas f
-                ON f.cliente_id = c.id
-                AND YEAR(f.mes_facturado) = ?
-            WHERE 1=1
-                ${filtroEstadoSql}
-            GROUP BY c.id
-        `, [anio]);
-
-        const deudasMap = new Map();
-        for (const deuda of deudas) {
-            deudasMap.set(deuda.cliente_id, Number(deuda.total_por_pagar || 0));
-        }
-
-        const clientesMap = new Map();
-
-        for (const row of rows) {
-            if (!clientesMap.has(row.cliente_id)) {
-                const fechaCreacion = row.cliente_creado_en ? new Date(row.cliente_creado_en) : null;
-                const anioCreacion = fechaCreacion ? fechaCreacion.getUTCFullYear() : null;
-                const mesCreacion = fechaCreacion ? (fechaCreacion.getUTCMonth() + 1) : null;
-                const meses = {};
-
-                for (let mes = 1; mes <= 12; mes++) {
-                    let estadoInicial = 'sin_factura';
-                    if (anioCreacion !== null) {
-                        if (anio < anioCreacion || (anio === anioCreacion && mes < mesCreacion)) {
-                            estadoInicial = 'no_aplica';
-                        }
-                    }
-                    meses[mes] = estadoInicial;
-                }
-
-                clientesMap.set(row.cliente_id, {
-                    cliente_id: row.cliente_id,
-                    cliente_nombre: row.cliente_nombre,
-                    cliente_apellido: row.cliente_apellido,
-                    cliente_activo: row.cliente_activo === 1,
-                    total_por_pagar: deudasMap.get(row.cliente_id) || 0,
-                    meses
-                });
-            }
-
-            if (row.mes_numero >= 1 && row.mes_numero <= 12) {
-                const estadoMes = row.pagada === 1 ? 'pagada' : (row.total_facturas_mes > 0 ? 'pendiente' : 'sin_factura');
-                clientesMap.get(row.cliente_id).meses[row.mes_numero] = estadoMes;
-            }
-        }
-
-        let data = Array.from(clientesMap.values());
-        if (soloConDeuda) {
-            data = data.filter(item => Number(item.total_por_pagar || 0) > 0);
-        }
-        const granTotalPorPagar = data.reduce((acc, item) => acc + Number(item.total_por_pagar || 0), 0);
+        const { data, granTotalPorPagar } = await facturacionService.resumenAnual(anio, estadoCliente, soloConDeuda);
 
         res.json({
             success: true,

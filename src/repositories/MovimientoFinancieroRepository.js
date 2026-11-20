@@ -17,6 +17,16 @@ class MovimientoFinancieroRepository {
             [tipo, monto, descripcion, fecha, categoria, usuarioId, usuarioNombre]
         );
     }
+
+    /** Ingreso por el cobro de una factura */
+    async registrarPagoDeFactura({ monto, descripcion, clienteId, facturaId, usuarioId, usuarioNombre }) {
+        await this.conexion.query(
+            `INSERT INTO movimientos_financieros 
+                    (tipo, monto, descripcion, cliente_id, factura_id, usuario_id, usuario_nombre) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            ['ingreso', monto, descripcion, clienteId, facturaId, usuarioId, usuarioNombre]
+        );
+    }
 }
 
 module.exports = { MovimientoFinancieroRepository };
