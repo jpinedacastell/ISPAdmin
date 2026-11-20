@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/auth');
-const db = require('../config/database');
+const reporteService = require('../services/reportes');
 
 // Ruta principal para mostrar la vista de gestión de reportes
 router.get('/', verifyToken, (req, res) => {
@@ -15,20 +15,7 @@ router.get('/', verifyToken, (req, res) => {
 // API para obtener la lista de todos los reportes para DataTables
 router.get('/list', verifyToken, async (req, res) => {
     try {
-        const [reportes] = await db.query(`
-            SELECT 
-                r.id,
-                r.tipo_reporte,
-                r.descripcion,
-                r.estado,
-                r.created_at,
-                c.nombre as cliente_nombre,
-                c.apellido as cliente_apellido
-            FROM reportes r
-            JOIN clientes c ON r.cliente_id = c.id
-            ORDER BY r.created_at DESC
-        `);
-        res.json(reportes);
+        res.json(await reporteService.listar());
     } catch (error) {
         console.error("Error al obtener la lista de reportes:", error);
         res.status(500).json({ error: 'Error interno del servidor' });
@@ -45,7 +32,7 @@ router.patch('/:id/estado', verifyToken, async (req, res) => {
     }
 
     try {
-        await db.query('UPDATE reportes SET estado = ? WHERE id = ?', [estado, id]);
+        await reporteService.cambiarEstado(id, estado);
         res.json({ success: true, message: 'Estado del reporte actualizado correctamente.' });
     } catch (error) {
         console.error(`Error al actualizar el estado del reporte ${id}:`, error);
