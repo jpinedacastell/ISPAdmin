@@ -1,15 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/auth');
-const db = require('../config/database');
-const facturacionService = require('../services/facturacionService');
 const { HTTP_STATUS } = require('../constants/http');
-const { conTransaccion } = require('../database/conTransaccion');
 const { ClienteId, ClienteIdInvalidoError } = require('../domain/clientes/ClienteId');
 const { normalizarDatosCliente, validarDatosCliente } = require('../domain/clientes/datosCliente');
 const { TIPO_RESULTADO } = require('../domain/clientes/ResultadoEliminacion');
-const { ClienteRepository } = require('../repositories/ClienteRepository');
-const { EliminarClienteService } = require('../services/clientes/EliminarClienteService');
+const { RESULTADO_ESTADO } = require('../services/clientes/ClienteService');
+const clienteService = require('../services/clientes');
 
 // Ruta para listar clientes
 router.get('/', verifyToken, async (req, res) => {
@@ -26,45 +23,19 @@ router.get('/', verifyToken, async (req, res) => {
 
 // API para obtener lista de clientes
 router.get('/list', verifyToken, async (req, res) => {
-    let connection;
     try {
-        connection = await db.getConnection();
-        const [clientes] = await connection.query(`
-            SELECT 
-                c.*,
-                cp.plan_id,
-                cp.activo,
-                p.nombre as plan_nombre,
-                p.velocidad_descarga,
-                p.velocidad_subida,
-                p.precio
-            FROM clientes c
-            LEFT JOIN (
-                SELECT cliente_id, plan_id, activo
-                FROM cliente_plan
-                WHERE fecha_fin IS NULL
-            ) cp ON c.id = cp.cliente_id
-            LEFT JOIN planes p ON cp.plan_id = p.id
-            ORDER BY c.nombre, c.apellido
-        `);
-
-        res.json(clientes);
+        res.json(await clienteService.listar());
     } catch (error) {
         console.error('Error al obtener clientes:', error);
         res.status(500).json({ error: 'Error al obtener la lista de clientes' });
-    } finally {
-        if (connection) {
-            connection.release();
-        }
     }
 });
 
 // Ruta para mostrar formulario de nuevo cliente (DEBE IR ANTES DE /:id)
 router.get('/nuevo', verifyToken, async (req, res) => {
     try {
-        // Obtener lista de planes activos
-        const [planes] = await db.query('SELECT * FROM planes WHERE activo = true ORDER BY velocidad_descarga');
-        
+        const planes = await clienteService.planesActivos();
+
         res.render('clientes/nuevo', {
             title: 'Nuevo Cliente',
             currentPage: 'clientes',
@@ -79,27 +50,12 @@ router.get('/nuevo', verifyToken, async (req, res) => {
 // Ruta para obtener datos de edición del cliente
 router.get('/:id/edit', verifyToken, async (req, res) => {
     try {
-        const [clientes] = await db.query(`
-            SELECT 
-                c.*,
-                cp.plan_id,
-                cp.activo,
-                cp.fecha_inicio,
-                p.nombre as plan_nombre,
-                p.velocidad_descarga,
-                p.velocidad_subida,
-                p.precio
-            FROM clientes c
-            LEFT JOIN cliente_plan cp ON c.id = cp.cliente_id AND cp.fecha_fin IS NULL
-            LEFT JOIN planes p ON cp.plan_id = p.id
-            WHERE c.id = ?
-        `, [req.params.id]);
-        
-        if (clientes.length === 0) {
+        const cliente = await clienteService.obtenerParaEdicion(req.params.id);
+        if (!cliente) {
             return res.status(404).json({ error: 'Cliente no encontrado' });
         }
-        
-        res.json(clientes[0]);
+
+        res.json(cliente);
     } catch (error) {
         console.error('Error al obtener cliente:', error);
         res.status(500).json({ error: 'Error al obtener cliente' });
@@ -108,106 +64,15 @@ router.get('/:id/edit', verifyToken, async (req, res) => {
 
 // GET /clientes/:id - Muestra la página de detalles de un cliente específico
 router.get('/:id', verifyToken, async (req, res) => {
-    let connection;
     try {
-        connection = await db.getConnection();
-        
-        // Obtener información del cliente con su plan activo
-        const [clientes] = await connection.query(`
-            SELECT 
-                c.*,
-                cp.plan_id,
-                cp.activo,
-                cp.fecha_inicio,
-                p.nombre as plan_nombre,
-                p.velocidad_descarga,
-                p.velocidad_subida,
-                p.precio
-            FROM clientes c
-            LEFT JOIN cliente_plan cp ON c.id = cp.cliente_id AND cp.activo = 1
-            LEFT JOIN planes p ON cp.plan_id = p.id
-            WHERE c.id = ?
-        `, [req.params.id]);
-        
-        if (clientes.length === 0) {
+        const detalle = await clienteService.obtenerDetalle(req.params.id);
+        if (!detalle) {
             req.flash('error_msg', 'Cliente no encontrado');
             return res.redirect('/clientes');
         }
 
-        const cliente = clientes[0];
-        await facturacionService.ensureAbonosSchema(connection);
+        const { cliente, facturas, estadoPago, tickets, notas } = detalle;
 
-        // CORRECCIÓN: Se añaden las columnas 'año_facturado' y 'mes_facturado_index'
-        const [facturas] = await connection.query(`
-            SELECT 
-                id, numero_factura, cliente_id, plan_id,
-                DATE_FORMAT(fecha_emision, '%Y-%m-%d') as fecha_emision,
-                DATE_FORMAT(fecha_vencimiento, '%Y-%m-%d') as fecha_vencimiento,
-                DATE_FORMAT(mes_facturado, '%Y-%m-01') as mes_facturado,
-                CAST(monto as DECIMAL(10,2)) as monto,
-                COALESCE(monto_pagado, 0) as monto_pagado,
-                COALESCE(pago_recibido, 0) as pago_recibido,
-                COALESCE(credito_aplicado, 0) as credito_aplicado,
-                COALESCE(abono_siguiente, 0) as abono_siguiente,
-                GREATEST(
-                    (monto - COALESCE(descuento_monto, 0)) -
-                    COALESCE(monto_pagado, 0) -
-                    COALESCE(credito_aplicado, 0),
-                    0
-                ) as saldo_pendiente,
-                estado, metodo_pago,
-                YEAR(mes_facturado) as año_facturado,
-                MONTH(mes_facturado) as mes_facturado_index
-            FROM facturas 
-            WHERE cliente_id = ? 
-            ORDER BY mes_facturado DESC
-        `, [req.params.id]);
-
-        // Obtener estado de pago del cliente
-        const [estadoPago] = await connection.query(`
-            SELECT 
-                CASE
-                    WHEN COUNT(*) = 0 THEN 'sin_facturas'
-                    WHEN SUM(CASE WHEN estado = 'vencida' THEN 1 ELSE 0 END) > 0 THEN 'moroso'
-                    WHEN SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) > 0 THEN 'pendiente'
-                    ELSE 'al_dia'
-                END as estado_pago,
-                COUNT(*) as total_facturas,
-                SUM(CASE WHEN estado = 'pagada' THEN 1 ELSE 0 END) as facturas_pagadas,
-                SUM(CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END) as facturas_pendientes,
-                SUM(CASE WHEN estado = 'vencida' THEN 1 ELSE 0 END) as facturas_vencidas
-            FROM facturas 
-            WHERE cliente_id = ?
-        `, [req.params.id]);
-
-        // Variables para datos opcionales
-        let tickets = [];
-        let notas = [];
-
-        // Intentar obtener tickets si la tabla existe
-        try {
-            const [ticketsResult] = await connection.query(`
-                SELECT * FROM tickets 
-                WHERE cliente_id = ? 
-                ORDER BY created_at DESC
-            `, [req.params.id]);
-            tickets = ticketsResult;
-        } catch (error) {
-            if (error.code !== 'ER_NO_SUCH_TABLE') throw error;
-        }
-
-        // Intentar obtener notas si la tabla existe
-        try {
-            const [notasResult] = await connection.query(`
-                SELECT * FROM notas_cliente 
-                WHERE cliente_id = ? 
-                ORDER BY created_at DESC
-            `, [req.params.id]);
-            notas = notasResult;
-        } catch (error) {
-            if (error.code !== 'ER_NO_SUCH_TABLE') throw error;
-        }
-        
         let añoSeleccionado = parseInt(req.query.año);
         if (isNaN(añoSeleccionado)) {
             añoSeleccionado = facturas.length > 0 ? new Date(facturas[0].mes_facturado).getFullYear() : new Date().getFullYear();
@@ -220,7 +85,7 @@ router.get('/:id', verifyToken, async (req, res) => {
             facturas,
             tickets,
             notas,
-            estadoPago: estadoPago[0],
+            estadoPago,
             user: req.session.user,
             añoSeleccionado
         });
@@ -228,16 +93,11 @@ router.get('/:id', verifyToken, async (req, res) => {
         console.error('Error al obtener detalles del cliente:', error);
         req.flash('error_msg', 'No se pudieron cargar los detalles del cliente.');
         res.redirect('/clientes');
-    } finally {
-        if (connection) {
-            connection.release();
-        }
     }
 });
 
 // API para crear nuevo cliente
 router.post('/', verifyToken, async (req, res) => {
-    let connection;
     try {
         const datos = normalizarDatosCliente(req.body);
 
@@ -246,47 +106,22 @@ router.post('/', verifyToken, async (req, res) => {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({ success: false, error });
         }
 
-        connection = await db.getConnection();
-        await connection.beginTransaction();
-
-        const duplicado = await new ClienteRepository(connection).buscarDuplicado(datos);
-        if (duplicado) {
-            await connection.rollback();
-            return res.status(HTTP_STATUS.CONFLICT).json({ success: false, error: duplicado });
+        const resultado = await clienteService.crear(datos);
+        if ('duplicado' in resultado) {
+            return res.status(HTTP_STATUS.CONFLICT).json({ success: false, error: resultado.duplicado });
         }
 
-        const [result] = await connection.query(
-            'INSERT INTO clientes (nombre, apellido, dni, email, telefono, direccion) VALUES (?, ?, ?, ?, ?, ?)',
-            [datos.nombre, datos.apellido, datos.dni, datos.email, datos.telefono, datos.direccion]
-        );
-
-        await connection.query(
-            'INSERT INTO cliente_plan (cliente_id, plan_id, fecha_inicio, activo) VALUES (?, ?, NOW(), true)',
-            [result.insertId, datos.plan_id]
-        );
-
-        await connection.commit();
-        res.json({ success: true, clienteId: result.insertId });
-
+        res.json({ success: true, clienteId: resultado.clienteId });
     } catch (error) {
-        if (connection) {
-            await connection.rollback();
-        }
         console.error('Error al crear cliente:', error);
         res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ success: false, error: 'Error al crear el cliente' });
-    } finally {
-        if (connection) {
-            connection.release();
-        }
     }
 });
 
 // Actualizar cliente
 router.put('/:id', verifyToken, async (req, res) => {
-    let connection;
     try {
         const { id } = req.params;
-        const { plan_id } = req.body;
         const datos = normalizarDatosCliente(req.body);
 
         const errorValidacion = validarDatosCliente(datos, { requierePlan: false });
@@ -294,175 +129,60 @@ router.put('/:id', verifyToken, async (req, res) => {
             return res.status(HTTP_STATUS.BAD_REQUEST).json({ success: false, error: errorValidacion });
         }
 
-        connection = await db.getConnection();
-        await connection.beginTransaction();
-
-        try {
-            const duplicado = await new ClienteRepository(connection).buscarDuplicado(datos, Number(id));
-            if (duplicado) {
-                await connection.rollback();
-                return res.status(HTTP_STATUS.CONFLICT).json({ success: false, error: duplicado });
-            }
-
-            // Actualizar datos del cliente
-            await connection.query(
-                `UPDATE clientes 
-                 SET nombre = ?, 
-                     apellido = ?, 
-                     dni = ?,
-                     email = ?, 
-                     telefono = ?, 
-                     direccion = ?
-                 WHERE id = ?`,
-                [datos.nombre, datos.apellido, datos.dni, datos.email, datos.telefono, datos.direccion, id]
-            );
-
-            // Manejar actualización del plan
-            if (plan_id !== undefined) {
-                // Obtener plan actual
-                const [currentPlan] = await connection.query(
-                    'SELECT plan_id FROM cliente_plan WHERE cliente_id = ? AND fecha_fin IS NULL',
-                    [id]
-                );
-
-                // Solo actualizar si el plan ha cambiado
-                if ((!currentPlan[0] && plan_id) || (currentPlan[0] && currentPlan[0].plan_id !== parseInt(plan_id))) {
-                    // Finalizar plan actual si existe
-                    if (currentPlan[0]) {
-                        await connection.query(
-                            `UPDATE cliente_plan 
-                             SET fecha_fin = CURRENT_DATE(), activo = false
-                             WHERE cliente_id = ? AND fecha_fin IS NULL`,
-                            [id]
-                        );
-                    }
-
-                    // Insertar nuevo plan si se proporciona uno
-                    if (plan_id) {
-                        await connection.query(
-                            `INSERT INTO cliente_plan (cliente_id, plan_id, fecha_inicio, activo)
-                             VALUES (?, ?, CURRENT_DATE(), true)`,
-                            [id, plan_id]
-                        );
-                    }
-                }
-            }
-
-            await connection.commit();
-
-            // Obtener cliente actualizado
-            const [clientes] = await connection.query(`
-                SELECT c.*, 
-                       cp.plan_id,
-                       cp.activo,
-                       cp.fecha_inicio,
-                       p.nombre as plan_nombre,
-                       p.velocidad_descarga,
-                       p.velocidad_subida,
-                       p.precio
-                FROM clientes c
-                LEFT JOIN cliente_plan cp ON c.id = cp.cliente_id AND cp.fecha_fin IS NULL
-                LEFT JOIN planes p ON cp.plan_id = p.id
-                WHERE c.id = ?
-            `, [id]);
-
-            res.json({
-                success: true,
-                message: 'Cliente actualizado correctamente',
-                cliente: clientes[0]
-            });
-        } catch (error) {
-            await connection.rollback();
-            throw error;
+        const resultado = await clienteService.actualizar(id, datos, req.body.plan_id);
+        if ('duplicado' in resultado) {
+            return res.status(HTTP_STATUS.CONFLICT).json({ success: false, error: resultado.duplicado });
         }
+
+        res.json({
+            success: true,
+            message: 'Cliente actualizado correctamente',
+            cliente: resultado.cliente
+        });
     } catch (error) {
         console.error('Error al actualizar cliente:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: error.message || 'Error al actualizar cliente' 
+            error: error.message || 'Error al actualizar cliente'
         });
-    } finally {
-        if (connection) {
-            connection.release();
-        }
     }
 });
 
 // API para cambiar estado del cliente
-router.patch('/:id/toggle', verifyToken, async (req, res) => {
-    let connection;
-    try {
-        const { id } = req.params;
-        
-        connection = await db.getConnection();
-        await connection.beginTransaction();
-
-        try {
-            // Verificar si el cliente existe
-            const [cliente] = await connection.query(
-                'SELECT id FROM clientes WHERE id = ?',
-                [id]
-            );
-
-            if (cliente.length === 0) {
-                await connection.rollback();
-                return res.status(404).json({ 
-                    success: false,
-                    error: 'Cliente no encontrado' 
-                });
-            }
-
-            // Obtener el estado actual del cliente y su plan
-            const [clientePlanes] = await connection.query(
-                'SELECT cp.id, cp.activo, cp.plan_id FROM cliente_plan cp WHERE cp.cliente_id = ? AND cp.fecha_fin IS NULL',
-                [id]
-            );
-            
-            if (clientePlanes.length === 0) {
-                await connection.rollback();
-                return res.status(400).json({ 
-                    success: false,
-                    error: 'El cliente no tiene un plan activo asignado' 
-                });
-            }
-
-            // Cambiar el estado
-            const nuevoEstado = !clientePlanes[0].activo;
-            
-            const result = await connection.query(
-                'UPDATE cliente_plan SET activo = ? WHERE id = ? AND cliente_id = ? AND fecha_fin IS NULL',
-                [nuevoEstado, clientePlanes[0].id, id]
-            );
-
-            if (result[0].affectedRows === 0) {
-                await connection.rollback();
-                return res.status(500).json({ 
-                    success: false,
-                    error: 'No se pudo actualizar el estado del cliente' 
-                });
-            }
-
-            await connection.commit();
-            
-            res.json({ 
-                success: true, 
-                message: `Cliente ${nuevoEstado ? 'activado' : 'desactivado'} correctamente`,
-                activo: nuevoEstado
-            });
-        } catch (error) {
-            await connection.rollback();
-            throw error;
+const RESPUESTA_CAMBIO_ESTADO = Object.freeze({
+    [RESULTADO_ESTADO.NO_ENCONTRADO]: () => ({
+        status: HTTP_STATUS.NOT_FOUND,
+        body: { success: false, error: 'Cliente no encontrado' }
+    }),
+    [RESULTADO_ESTADO.SIN_PLAN]: () => ({
+        status: HTTP_STATUS.BAD_REQUEST,
+        body: { success: false, error: 'El cliente no tiene un plan activo asignado' }
+    }),
+    [RESULTADO_ESTADO.NO_ACTUALIZADO]: () => ({
+        status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        body: { success: false, error: 'No se pudo actualizar el estado del cliente' }
+    }),
+    [RESULTADO_ESTADO.CAMBIADO]: ({ activo }) => ({
+        status: HTTP_STATUS.OK,
+        body: {
+            success: true,
+            message: `Cliente ${activo ? 'activado' : 'desactivado'} correctamente`,
+            activo
         }
+    })
+});
+
+router.patch('/:id/toggle', verifyToken, async (req, res) => {
+    try {
+        const resultado = await clienteService.cambiarEstado(req.params.id);
+        const { status, body } = RESPUESTA_CAMBIO_ESTADO[resultado.tipo](resultado);
+        res.status(status).json(body);
     } catch (error) {
         console.error('Error al cambiar estado del cliente:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: 'Error al cambiar estado del cliente: ' + error.message 
+            error: 'Error al cambiar estado del cliente: ' + error.message
         });
-    } finally {
-        if (connection) {
-            connection.release();
-        }
     }
 });
 
@@ -498,11 +218,7 @@ const RESPUESTA_ELIMINACION = Object.freeze({
 
 router.delete('/:id', verifyToken, async (req, res) => {
     try {
-        const clienteId = new ClienteId(req.params.id);
-
-        const resultado = await conTransaccion(db, (conexion) =>
-            new EliminarClienteService({ clienteRepository: new ClienteRepository(conexion) }).ejecutar(clienteId)
-        );
+        const resultado = await clienteService.eliminar(new ClienteId(req.params.id));
 
         const { status, body } = RESPUESTA_ELIMINACION[resultado.tipo](resultado);
         res.status(status).json(body);
@@ -525,18 +241,12 @@ router.delete('/:id', verifyToken, async (req, res) => {
 // API para agregar nota
 router.post('/:id/notas', verifyToken, async (req, res) => {
     try {
-        const { id } = req.params;
-        const { nota } = req.body;
-
-        const [result] = await db.query(
-            'INSERT INTO notas_cliente (cliente_id, nota, fecha_creacion) VALUES (?, ?, CURRENT_TIMESTAMP)',
-            [id, nota]
-        );
+        const notaId = await clienteService.agregarNota(req.params.id, req.body.nota);
 
         res.json({
             success: true,
             message: 'Nota agregada exitosamente',
-            nota_id: result.insertId
+            nota_id: notaId
         });
     } catch (error) {
         console.error('Error al agregar nota:', error);
@@ -548,11 +258,7 @@ router.post('/:id/notas', verifyToken, async (req, res) => {
 router.delete('/:id/notas/:nota_id', verifyToken, async (req, res) => {
     try {
         const { id, nota_id } = req.params;
-
-        await db.query(
-            'DELETE FROM notas_cliente WHERE id = ? AND cliente_id = ?',
-            [nota_id, id]
-        );
+        await clienteService.eliminarNota(nota_id, id);
 
         res.json({
             success: true,
@@ -564,4 +270,4 @@ router.delete('/:id/notas/:nota_id', verifyToken, async (req, res) => {
     }
 });
 
-module.exports = router; 
+module.exports = router;
