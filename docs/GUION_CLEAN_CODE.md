@@ -1,5 +1,7 @@
 # Guion (5 min): Eliminar clientes con Clean Code y SOLID
 
+**Código de verificación:** `LEARN-CAP-7AA6B634`
+
 > Tip: no hay que leerlo palabra por palabra. Cada parte tiene una **idea clave**; si te
 > acuerdas de esa idea, lo demás sale solo.
 > Las líneas **📂 Mostrar** dicen qué archivo y qué líneas abrir en pantalla.
