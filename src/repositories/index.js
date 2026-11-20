@@ -11,6 +11,8 @@ const { ReporteRepository } = require('./ReporteRepository');
 const { AdminRepository } = require('./AdminRepository');
 const { DashboardRepository } = require('./DashboardRepository');
 const { FacturaRepository } = require('./FacturaRepository');
+const { TicketRepository } = require('./TicketRepository');
+const { ServicioCatalogoRepository } = require('./ServicioCatalogoRepository');
 
 const crearRepositorios = (conexion) => ({
     clientes: new ClienteRepository(conexion),
@@ -21,7 +23,9 @@ const crearRepositorios = (conexion) => ({
     reportes: new ReporteRepository(conexion),
     admins: new AdminRepository(conexion),
     dashboard: new DashboardRepository(conexion),
-    facturas: new FacturaRepository(conexion)
+    facturas: new FacturaRepository(conexion),
+    tickets: new TicketRepository(conexion),
+    servicios: new ServicioCatalogoRepository(conexion)
 });
 
 /**
