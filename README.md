@@ -62,6 +62,7 @@ src/routes/      src/services/            src/repositories/
 │   └── config/           Conexión a la base de datos
 ├── public/               Archivos públicos (imágenes, verificacion.txt)
 ├── practica-5/           Clínica de código: enfermo.js, sano.js, pruebas y diagnóstico
+├── practica-6/           Arquitectura: diagramas C4 (contexto y contenedores)
 └── docs/                 Guion de la presentación y documentación
 ```
 
@@ -126,4 +127,5 @@ npm test                 # ambas
 ## Documentación
 
 - [`practica-5/`](practica-5/): clínica de código (enfermo, sano, pruebas y diagnóstico).
+- [`practica-6/arquitectura.md`](practica-6/arquitectura.md): arquitectura del sistema con el modelo C4 (niveles 1 y 2).
 - [`docs/GUION_CLEAN_CODE.md`](docs/GUION_CLEAN_CODE.md): guion de la presentación de Clean Code y SOLID.
